@@ -69,6 +69,8 @@ p.1 <- ggplot(CogED_sum, aes(x=agegroup, y=SV, fill=Task)) +
 p.1 + facet_wrap(.~Condition) + scale_fill_brewer(palette = "Set1")
 ```
 
+###Older Adult Data--Broken Down into Gain & Loss
+
 ``` {r CogED_OAs, warning = F, message = F}
 Cog_ED_ind_SV <- d.coged %>% filter(agegroup == "old") %>%
   mutate(meanSV_gain = (SV_red__gain + SV_blue__gain + SV_purple__gain)/3,
@@ -79,19 +81,21 @@ Cog_ED_ind_SV <- d.coged %>% filter(agegroup == "old") %>%
 #Plotting SV across both gain and loss domains
 p.2 <-  ggplot(Cog_ED_ind_SV, aes(meanSV_gain, meanSV_loss)) +
    theme(plot.title = element_text(hjust = 0.5), panel.grid.major = element_blank(), panel.grid.minor = element_blank(), panel.background = element_blank(), axis.line = element_line(colour = "black")) +
-  geom_point() + geom_smooth(method=lm) +ggtitle("") +
+  geom_point() + geom_smooth(method=lm) +ggtitle("OAs--Gain vs. Loss") +
     xlab("Gain") + ylab("Loss")
 p.2
 
+#Plotting average hit rate on the N-Back versus SV (Gain Condition)
 p.3 <-  ggplot(Cog_ED_ind_SV, aes(mean_HitRate, meanSV_gain)) +
    theme(plot.title = element_text(hjust = 0.5), panel.grid.major = element_blank(), panel.grid.minor = element_blank(), panel.background = element_blank(), axis.line = element_line(colour = "black")) +
-  geom_point() + geom_smooth(method=lm) +ggtitle("") +
+  geom_point() + geom_smooth(method=lm) +ggtitle("N-Back Performance & SV (Gain Condition)") +
     xlab("Average N-Back Hit Rate") + ylab("Gain")
 p.3
 
+#Plotting the average hit rate on the N-Back versus the difference in SV (Loss-Gain)
 p.4 <-  ggplot(Cog_ED_ind_SV, aes(mean_HitRate, LossGain_diff)) +
    theme(plot.title = element_text(hjust = 0.5), panel.grid.major = element_blank(), panel.grid.minor = element_blank(), panel.background = element_blank(), axis.line = element_line(colour = "black")) +
-  geom_point() + geom_smooth(method=lm) +ggtitle("") +
+  geom_point() + geom_smooth(method=lm) +ggtitle("N-Back Performance & Loss-Gain Difference") +
     xlab("Average N-Back Hit Rate") + ylab("Loss-Gain Difference")
 p.4
 

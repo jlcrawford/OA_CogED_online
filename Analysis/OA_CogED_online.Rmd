@@ -12,7 +12,7 @@ output:
 rm(list=ls())
 
 # Packages
-library(stringr); library(lme4); library(knitr); library(kableExtra); library(RColorBrewer); library(tidyverse);
+library(lme4); library(knitr); library(kableExtra); library(RColorBrewer); library(tidyverse);
 source("summarySEwithin2.R")
 
 #Create data directories
@@ -27,7 +27,8 @@ demo <- read.csv(demo.path, header = T)
 ```{r SV_CogED, warning=F, message=F}
 #clean data frame with Cog-ED SV estimates and transform data across so that SV estimates are equivalent across both domains (i.e., gain, loss)
 d.coged <- coged %>% select(subjectid, groupid, agegroup, IP12_1, IP12_2, IP12_3, IP13_1, IP13_2, IP13_3, IP14_1, IP14_2, IP14_3,
-                            IP12_1_loss, IP12_2_loss, IP12_3_loss, IP13_1_loss, IP13_2_loss, IP13_3_loss, IP14_1_loss, IP14_2_loss, IP14_3_loss) %>%
+                            IP12_1_loss, IP12_2_loss, IP12_3_loss, IP13_1_loss, IP13_2_loss, IP13_3_loss, IP14_1_loss, IP14_2_loss, IP14_3_loss,
+                            hitrate_N1, hitrate_N2, hitrate_N3, hitrate_N4) %>%
   group_by(subjectid, agegroup) %>%
   mutate(SV_red__gain = (IP12_1/2 + IP12_2/3 + IP12_3/4)/3,
          SV_blue__gain = (IP13_1/2 + IP13_2/3 + IP13_3/4)/3,
@@ -41,7 +42,15 @@ d.coged.SV <- d.coged %>% select(subjectid, agegroup, SV_red__gain, SV_blue__gai
   separate(col = tmp, into=c("Task","Condition"), sep = "__") %>%
   separate(col = Task, into=c(NA,"Task"), sep = "_") %>%
   mutate(taskCode = factor(Task, levels=c("red","blue","purple"), labels=c(-1,0,1)),
-         ageCode = factor(agegroup, levels = c("young","old"), labels = c(0,1)))
+         ageCode = factor(agegroup, levels = c("young","old"), labels = c(0,1)), 
+         conditionCode = factor(Condition, levels = c("gain","loss"), labels = c(0,1)))
+d.coged.SV$taskCode <- as.numeric(d.coged.SV$taskCode)
+d.coged.SV$ageCode <- as.numeric(d.coged.SV$ageCode)
+d.coged.SV$conditionCode <- as.numeric(d.coged.SV$conditionCode)
+
+#MLM
+m.1 <- lmer(data = d.coged.SV, SV ~ taskCode*ageCode*conditionCode + (1 | subjectid))
+summary(m.1)
 ```
 
 ##Cognitive Effort Discounting
@@ -58,6 +67,34 @@ p.1 <- ggplot(CogED_sum, aes(x=agegroup, y=SV, fill=Task)) +
   coord_cartesian(ylim=c(0,1)) +
   xlab("") + ylab("Subjective Value") + ggtitle("Cognitive Effort Discounting")
 p.1 + facet_wrap(.~Condition) + scale_fill_brewer(palette = "Set1")
+```
+
+``` {r CogED_OAs, warning = F, message = F}
+Cog_ED_ind_SV <- d.coged %>% filter(agegroup == "old") %>%
+  mutate(meanSV_gain = (SV_red__gain + SV_blue__gain + SV_purple__gain)/3,
+         meanSV_loss = (SV_red__loss + SV_blue__loss + SV_purple__loss)/3, 
+         mean_HitRate = (hitrate_N1 + hitrate_N2 + hitrate_N3 + hitrate_N4)/4,
+         LossGain_diff = meanSV_loss-meanSV_gain)
+
+#Plotting SV across both gain and loss domains
+p.2 <-  ggplot(Cog_ED_ind_SV, aes(meanSV_gain, meanSV_loss)) +
+   theme(plot.title = element_text(hjust = 0.5), panel.grid.major = element_blank(), panel.grid.minor = element_blank(), panel.background = element_blank(), axis.line = element_line(colour = "black")) +
+  geom_point() + geom_smooth(method=lm) +ggtitle("") +
+    xlab("Gain") + ylab("Loss")
+p.2
+
+p.3 <-  ggplot(Cog_ED_ind_SV, aes(mean_HitRate, meanSV_gain)) +
+   theme(plot.title = element_text(hjust = 0.5), panel.grid.major = element_blank(), panel.grid.minor = element_blank(), panel.background = element_blank(), axis.line = element_line(colour = "black")) +
+  geom_point() + geom_smooth(method=lm) +ggtitle("") +
+    xlab("Average N-Back Hit Rate") + ylab("Gain")
+p.3
+
+p.4 <-  ggplot(Cog_ED_ind_SV, aes(mean_HitRate, LossGain_diff)) +
+   theme(plot.title = element_text(hjust = 0.5), panel.grid.major = element_blank(), panel.grid.minor = element_blank(), panel.background = element_blank(), axis.line = element_line(colour = "black")) +
+  geom_point() + geom_smooth(method=lm) +ggtitle("") +
+    xlab("Average N-Back Hit Rate") + ylab("Loss-Gain Difference")
+p.4
+
 ```
 
 ##NASA TLX

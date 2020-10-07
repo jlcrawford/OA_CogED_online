@@ -176,6 +176,11 @@ p.PTQ.subset <- ggplot(PTQ_subset_sum, aes(x=dimension, y=rating, fill=condition
   geom_bar(stat="identity", position=position_dodge()) +
   xlab("") + ylab("") + ggtitle("Post-Task Questionnaire (from subset of OAs who showed flipped responses, N=3)") 
 p.PTQ.subset + labs(fill = "Condition") + scale_fill_brewer(palette = "Set1")
+
+#self-reported strategies
+PTQ.strat.subset <- PTQ %>% select(subject, contains("strat")) %>% select(!contains("latency")) %>%
+  filter(subject == "5ea29d4aeeb3d71b9b736017" | subject == "5ea3fc787c48522165e5e4a5" | subject == "5ea1950819664f04542a50bf")
+kable(PTQ.strat.subset)
 ```
 
 ####Avoidance = To what degree did you choose the easier task because you wanted to avoid difficulty?

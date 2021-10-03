@@ -1,0 +1,376 @@
+---
+title: "Gain-Loss CogED + EMA Online"
+author: "JC"
+date: "10/03/2021"
+output:
+  html_document: default
+  code_folding: "hide"
+---
+# Online Cog-ED Pilots (second iteration)
+
+``` {r setup, warning=FALSE, message=FALSE}
+rm(list=ls())
+
+# Packages
+library(lme4); library(knitr); library(kableExtra); library(RColorBrewer); library(tidyverse);
+source("summarySEwithin2.R")
+
+#Create data directories
+coged.path<-"~/Box/CCPLab_Aging_Studies/OA_Effort_EMA/Data/Online/CogED/coged_ema_gainloss.csv"
+PTQ.path <- "~/Box/CCPLab_Aging_Studies/OA_Effort_EMA/Data/Online/CogED/coged_ema_ptq.csv"
+EMA.path <- "~/Box/CCPLab_Aging_Studies/OA_Effort_EMA/Data/Online/EMA/Online_CogED_EMA.csv"
+
+#Make data frames for Cog-ED and demographics info
+coged<- read.csv(coged.path, header = T)
+PTQ <- read.csv(PTQ.path, header = T)
+```
+
+``` {r SV_CogED, warning=F, message=F}
+#clean data frame with Cog-ED SV estimates and transform data across so that SV estimates are equivalent across both domains (i.e., gain, loss)
+d.coged <- coged %>% select(subjectid, groupid, agegroup, taskOrder, IP12_1, IP12_2, IP12_3, IP13_1, IP13_2, IP13_3, IP14_1, IP14_2, IP14_3,IP12_1_loss, IP12_2_loss, IP12_3_loss, IP13_1_loss, IP13_2_loss, IP13_3_loss, IP14_1_loss, IP14_2_loss, IP14_3_loss, hitrate_N1, hitrate_N2, hitrate_N3, hitrate_N4) %>%
+  group_by(subjectid, agegroup) %>%
+  mutate(SV_red__gain = (IP12_1/2 + IP12_2/3 + IP12_3/4)/3,
+         SV_blue__gain = (IP13_1/2 + IP13_2/3 + IP13_3/4)/3,
+         SV_purple__gain = (IP14_1/2 + IP14_2/3 + IP14_3/4)/3,
+         SV_red__loss = ((IP12_1_loss/2 + IP12_2_loss/3 + IP12_3_loss/4)/3)*-1,
+         SV_blue__loss = ((IP13_1_loss/2 + IP13_2_loss/3 + IP13_3_loss/4)/3)*-1,
+         SV_purple__loss = ((IP14_1_loss/2 + IP14_2_loss/3 + IP14_3_loss/4)/3)*-1)
+
+d.coged.SV <- d.coged %>% select(subjectid, agegroup, taskOrder, SV_red__gain, SV_blue__gain, SV_purple__gain, SV_red__loss, SV_blue__loss, SV_purple__loss) %>%
+  pivot_longer(names_to = "tmp", values_to = "SV", -c(subjectid, agegroup, taskOrder)) %>%
+  separate(col = tmp, into=c("Task","Condition"), sep = "__") %>%
+  separate(col = Task, into=c(NA,"Task"), sep = "_") %>%
+  mutate(taskCode = factor(Task, levels=c("red","blue","purple"), labels=c(-1,0,1)),
+         conditionCode = factor(Condition, levels = c("gain","loss"), labels = c(0,1)),
+         ageCode = factor(agegroup, levels = c("young", "old"), labels = c(0,1)))
+d.coged.SV$taskCode <- as.numeric(d.coged.SV$taskCode)
+d.coged.SV$conditionCode <- as.numeric(d.coged.SV$conditionCode)
+d.coged.SV$ageCode <- as.numeric(d.coged.SV$ageCode)
+
+m.coged <- lmer(data = d.coged.SV, SV ~ taskCode*conditionCode*ageCode + (1 | subjectid))
+summary(m.coged)
+```
+
+## Cognitive Effort Discounting
+
+``` {r CogED_Plot, warning = F, message = F}
+CogED_sum <- summarySEwithin2(d.coged.SV, measurevar = "SV", withinvars = c("Task","Condition"), betweenvars = "agegroup", idvar = "subjectid")
+CogED_sum$Task <- factor(CogED_sum$Task, levels = c("red","blue","purple"), labels = c("2-Back","3-Back","4-Back"))
+
+CogED_order_sum <- summarySEwithin2(d.coged.SV, measurevar = "SV", withinvars = c("Task","Condition"), betweenvars = c("taskOrder", "agegroup"), idvar = "subjectid")
+CogED_order_sum$Task <- factor(CogED_order_sum$Task, levels = c("red","blue","purple"), labels = c("2-Back","3-Back","4-Back"))
+
+d.coged.SV$Task <- factor(d.coged.SV$Task, levels = c("red","blue","purple"), labels = c("2-Back","3-Back","4-Back"))
+#Plotting SV across both gain and loss domains
+p.1 <- ggplot(CogED_sum, aes(x=Task, y=SV, fill=Task)) + 
+  theme(plot.title = element_text(hjust = 0.5), panel.grid.major = element_blank(), panel.grid.minor = element_blank(), panel.background = element_blank(), axis.line = element_line(colour = "black")) +
+  geom_bar(stat="identity", position=position_dodge(), alpha = .6) +
+  geom_errorbar(position=position_dodge(width=0.9), aes(ymin=SV-ci, ymax=SV+ci), width=.2) + 
+  geom_point(data = d.coged.SV, aes(x=Task, y=SV, color=Task),
+             stat="identity", alpha=0.7, position = "jitter") +
+  coord_cartesian(ylim=c(0,1)) +
+  scale_x_discrete(breaks=NULL) +
+  xlab("") + ylab("Subjective Value") + ggtitle("Cognitive Effort Discounting") +
+  facet_grid(.~Condition + agegroup)
+p.1 + scale_fill_brewer(palette = "Set1") + scale_color_brewer(palette = "Set1")
+
+
+p.2 <- ggplot(CogED_sum, aes(x=Task, y=SV)) + 
+  theme(plot.title = element_text(hjust = 0.5), panel.grid.major = element_blank(), panel.grid.minor = element_blank(), panel.background = element_blank(), axis.line = element_line(colour = "black")) +
+  geom_bar(stat="identity", position=position_dodge()) +
+  geom_errorbar(position=position_dodge(width=0.9), aes(ymin=SV-ci, ymax=SV+ci), width=.2) + 
+  geom_point(data = d.coged.SV, aes(x=Task, y=SV, group=subjectid),
+             stat="identity", alpha=0.7) +
+  geom_line(data = d.coged.SV, aes(x=Task, y=SV, group=subjectid, colour = factor(subjectid)), alpha = .5) +
+  coord_cartesian(ylim=c(0,1)) +
+  scale_x_discrete(breaks=NULL) +
+  xlab("") + ylab("Subjective Value") + ggtitle("Cognitive Effort Discounting") +
+  facet_wrap(.~Condition + agegroup)
+p.CogED <- p.2 + guides(colour=FALSE) 
+p.CogED
+```
+
+### Data Broken Down into Gain & Loss
+
+``` {r CogED_OAs, warning = F, message = F}
+Cog_ED_ind_SV <- d.coged %>%
+  mutate(meanSV_gain = (SV_red__gain + SV_blue__gain + SV_purple__gain)/3,
+         meanSV_loss = (SV_red__loss + SV_blue__loss + SV_purple__loss)/3, 
+         mean_HitRate = (hitrate_N1 + hitrate_N2 + hitrate_N3 + hitrate_N4)/4,
+         LossGain_diff = meanSV_loss-meanSV_gain)
+
+CogED_loss_subjs <- Cog_ED_ind_SV %>% filter(meanSV_loss >.85 & meanSV_gain <.1 & agegroup == "old") 
+#Plotting SV across both gain and loss domains
+p.GL <-  ggplot(Cog_ED_ind_SV, aes(meanSV_gain, meanSV_loss)) +
+   theme(plot.title = element_text(hjust = 0.5), panel.grid.major = element_blank(), panel.grid.minor = element_blank(), panel.background = element_blank(), axis.line = element_line(colour = "black")) +
+  geom_point(aes(colour = agegroup)) + geom_smooth(method=lm) +ggtitle("Gain vs. Loss Discounting") +
+    xlab("Gain") + ylab("Loss")
+p.GL + scale_colour_brewer(palette = "Paired", "Age Group")
+
+#Plotting average hit rate on the N-Back versus SV (Gain Condition)
+p.performance <-  ggplot(Cog_ED_ind_SV, aes(mean_HitRate, meanSV_gain)) +
+   theme(plot.title = element_text(hjust = 0.5), panel.grid.major = element_blank(), panel.grid.minor = element_blank(), panel.background = element_blank(), axis.line = element_line(colour = "black")) +
+  geom_point(aes(colour = agegroup)) + geom_smooth(method=lm) +ggtitle("N-Back Performance & SV (Gain Condition)") +
+    xlab("Average N-Back Hit Rate") + ylab("Gain")
+p.performance + scale_colour_brewer(palette = "Paired", "Age Group")
+```
+
+## NASA TLX
+#### Plotted with YAs from previous sample for visualization
+
+``` {r Self-Report, warning = F, message = F}
+#Mental Demand Ratings
+NASA.m.demand <- coged %>% select(subjectid, agegroup, mentaldemand_1, mentaldemand_2, mentaldemand_3, mentaldemand_4) %>%
+  group_by(subjectid) %>%
+  pivot_longer(names_to = "mental_demand", values_to = "rating", -c(subjectid, agegroup)) %>%
+  separate(col = mental_demand, into=c(NA,"Task"), sep = "_") 
+NASA_mdemand_sum <- summarySEwithin2(NASA.m.demand, measurevar = "rating", withinvars = c("Task"), betweenvars = c("agegroup"), idvar = "subjectid")
+NASA_mdemand_sum$Task <- factor(NASA_mdemand_sum$Task, levels = c(1,2,3,4), labels = c("1-Back","2-Back","3-Back","4-Back"))
+
+p.m.demand <- ggplot(NASA_mdemand_sum, aes(x=Task, y=rating, fill=agegroup)) + 
+  theme(plot.title = element_text(hjust = 0.5), panel.grid.major = element_blank(), panel.grid.minor = element_blank(), panel.background = element_blank(), axis.line = element_line(colour = "black")) +
+  geom_bar(stat="identity", position=position_dodge()) +
+  geom_errorbar(position=position_dodge(width=0.9), aes(ymin=rating-ci, ymax=rating+ci), width=.2) +  
+  xlab("Task") + ylab("Mental Demand") + ggtitle("Self-Reported Mental Demand") 
+p.m.demand + labs(fill = "Age Group") + scale_fill_brewer(palette = "Paired")
+
+#Frustration Ratings
+NASA.frust <- coged %>% select(subjectid, agegroup, frustration_1, frustration_2, frustration_3, frustration_4) %>%
+  group_by(subjectid, agegroup) %>%
+  pivot_longer(names_to = "frustration", values_to = "rating", -c(subjectid, agegroup)) %>%
+  separate(col = frustration, into=c(NA,"Task"), sep = "_") 
+NASA_frust_sum <- summarySEwithin2(NASA.frust, measurevar = "rating", withinvars = c("Task"), betweenvars = c("agegroup"), idvar = "subjectid")
+NASA_frust_sum$Task <- factor(NASA_frust_sum$Task, levels = c(1,2,3,4), labels = c("1-Back","2-Back","3-Back","4-Back"))
+
+p.frust <- ggplot(NASA_frust_sum, aes(x=Task, y=rating, fill=agegroup)) + 
+  theme(plot.title = element_text(hjust = 0.5), panel.grid.major = element_blank(), panel.grid.minor = element_blank(), panel.background = element_blank(), axis.line = element_line(colour = "black")) +
+  geom_bar(stat="identity", position=position_dodge()) +
+  geom_errorbar(position=position_dodge(width=0.9), aes(ymin=rating-ci, ymax=rating+ci), width=.2) +  
+  xlab("Task") + ylab("Frustration") + ggtitle("Self-Reported Frustration") 
+p.frust + labs(fill = "Age Group") + scale_fill_brewer(palette = "Paired")
+
+#Effort Ratings
+NASA.effort <- coged %>% select(subjectid, agegroup, effort_1, effort_2, effort_3, effort_4) %>%
+  group_by(subjectid, agegroup) %>%
+  pivot_longer(names_to = "effort", values_to = "rating", -c(subjectid, agegroup)) %>%
+  separate(col = effort, into=c(NA,"Task"), sep = "_") 
+NASA_effort_sum <- summarySEwithin2(NASA.effort, measurevar = "rating", withinvars = c("Task"), betweenvars = c("agegroup"), idvar = "subjectid")
+NASA_effort_sum$Task <- factor(NASA_effort_sum$Task, levels = c(1,2,3,4), labels = c("1-Back","2-Back","3-Back","4-Back"))
+
+p.effort <- ggplot(NASA_effort_sum, aes(x=Task, y=rating, fill=agegroup)) + 
+  theme(plot.title = element_text(hjust = 0.5), panel.grid.major = element_blank(), panel.grid.minor = element_blank(), panel.background = element_blank(), axis.line = element_line(colour = "black")) +
+  geom_bar(stat="identity", position=position_dodge()) +
+  geom_errorbar(position=position_dodge(width=0.9), aes(ymin=rating-ci, ymax=rating+ci), width=.2) +  
+  xlab("Task") + ylab("Frustration") + ggtitle("Self-Reported Effort") 
+p.effort + labs(fill = "Age Group") + scale_fill_brewer(palette = "Paired")
+```
+
+## Post-Task Questionnaire
+
+
+``` {r PTQ, warning = F, message = F}
+PTQ.clean <- PTQ %>%  select(subject, ends_with("response")) %>% select(!contains("strat")) %>%
+  pivot_longer(names_to = "condition", values_to = "rating", -subject) %>%
+  separate(col = condition, into=c("dimension","condition"), sep = "_") %>%
+  separate(col = condition, into=c("condition",NA), sep = "__")
+ 
+PTQ_sum <- summarySEwithin2(PTQ.clean, measurevar = "rating", withinvars = c("dimension","condition"), idvar = "subject")
+  
+p.PTQ <- ggplot(PTQ_sum, aes(x=dimension, y=rating, fill=condition)) + 
+  theme(plot.title = element_text(hjust = 0.5), panel.grid.major = element_blank(), panel.grid.minor = element_blank(), panel.background = element_blank(), axis.line = element_line(colour = "black")) +
+  geom_bar(stat="identity", position=position_dodge()) +
+  geom_errorbar(position=position_dodge(width=0.9), aes(ymin=rating-ci, ymax=rating+ci), width=.2) +  
+  xlab("") + ylab("") + ggtitle("Post-Task Questionnaire") 
+p.PTQ + labs(fill = "Condition") + scale_fill_brewer(palette = "Set1")
+```
+
+#### Avoidance = To what degree did you choose the easier task because you wanted to avoid difficulty?
+
+#### Caring = To what degree did you select tasks based on whether or not you would be able to win (or lose) money?
+
+#### Challenge = To what degree did you choose the harder task because you wanted to challenge yourself?
+
+#### Difficulty = To what degree were your choices based on the difficulty of each task?
+
+#### Effort = To what degree were your choices based on the amount of effort each task required?
+
+#### Maintenance = To what degree did you select tasks based on whether or not you would be able to maintain your effort?
+
+#### Money = To what degree were your choices based on the offer amount ($) of each task?
+
+### Testing for differences in task order
+
+``` {r orderEffects, warning = F, message = F}
+#plotting results broken down by task order
+##Order: 1=gain first, 2= loss first
+p.Order <- ggplot(CogED_order_sum, aes(x=Task, y=SV, fill=Task)) + 
+  theme(plot.title = element_text(hjust = 0.5), panel.grid.major = element_blank(), panel.grid.minor = element_blank(), panel.background = element_blank(), axis.line = element_line(colour = "black")) +
+  geom_bar(stat="identity", position=position_dodge(), alpha = .6) +
+  geom_errorbar(position=position_dodge(width=0.9), aes(ymin=SV-ci, ymax=SV+ci), width=.2) + 
+  geom_point(data = d.coged.SV, aes(x=Task, y=SV, color=Task),
+             stat="identity", alpha=0.7, position = "jitter") +
+  coord_cartesian(ylim=c(0,1)) +
+  scale_x_discrete(breaks=NULL) +
+  xlab("") + ylab("Subjective Value") + ggtitle("Cognitive Effort Discounting (Order Effects)") +
+  facet_grid(.~Condition + agegroup + taskOrder)
+p.Order + scale_fill_brewer(palette = "Set1") + scale_color_brewer(palette = "Set1")
+```
+
+# EMA Data
+
+``` {r importdata, echo = TRUE}
+#Import concatenated EMA data
+codebook.path <- "~/Box/CCPLab_Aging_Studies/OA_Effort_EMA/Data/Online/EMA/Codebook.csv"
+codebook <- read.csv(codebook.path, header = T)
+#create list of new variable names from codebook
+new.names <- codebook$new_itemname
+
+#read in EMA data
+EMA<- read.csv(EMA.path, header = T)
+
+#clean up extraneous variables from Qualtrics survey
+EMA.clean <- EMA %>% select(-c(EndDate, RecordedDate, Status, IPAddress, Progress, Finished, ResponseId, RecipientLastName, RecipientFirstName, RecipientEmail, ExternalReference, LocationLatitude, LocationLongitude, DistributionChannel, UserLanguage, SC0)) %>%
+  setNames(new.names)
+```
+
+## Average Survey Duration (in seconds)
+
+``` {r surveyDuration, echo = TRUE}
+mean_duration <- mean(EMA.clean$duration, na.rm = T)
+mean_duration
+```
+
+## Completion rate (42 total surveys)
+
+``` {r completion, echo = TRUE}
+completion<- EMA.clean %>% count(SubID)
+kable(completion)
+```
+
+## Current Affect 
+
+```{r affect, message=F, warning=F}
+#creating data frame from affect ratings
+current.affect <- EMA.clean %>% select(SubID,agegroup, starts_with("affect_")) %>%
+  pivot_longer(names_to = "Affect", values_to = "rating", -c(SubID, agegroup)) %>%
+  separate(col = Affect, into=c(NA,"Affect_Term"), sep = "_") 
+
+#summarizing average affect across all participants
+affect.subj <-current.affect %>% group_by(SubID,agegroup, Affect_Term) %>% 
+  dplyr::summarise(mean.affect = mean(rating, na.rm = T))
+
+affect.av <-current.affect %>% group_by(Affect_Term) %>%
+  dplyr::summarise(mean.affect = mean(rating, na.rm = T))
+affect.sum <- summarySEwithin2(affect.subj, measurevar = "mean.affect", withinvars = c("Affect_Term"), betweenvars = "agegroup", idvar = "SubID")
+
+#plotting average affect ratings
+affect.sum$Affect_Term <- factor(affect.sum$Affect_Term, levels = c("aroused", "excited", "happy", "calm", "fearful", "sluggish", "sad", "passive"), labels = c("Aroused", "Excited", "Happy", "Calm", "Fearful", "Sluggish", "Sad", "Passive"))
+p.affect <- ggplot(affect.sum, aes(x = Affect_Term, y= mean.affect, fill=agegroup)) +
+ theme(plot.title = element_text(hjust = 0.5), panel.grid.major = element_blank(), panel.grid.minor = element_blank(), panel.background = element_blank(), axis.line = element_line(colour = "black")) +
+  geom_bar(stat="identity", position=position_dodge()) +
+  geom_errorbar(position=position_dodge(width=0.9), aes(ymin=mean.affect-ci, ymax=mean.affect+ci), width=.2) +
+  coord_cartesian(ylim=c(1,4)) +
+  xlab("") + ylab("Affect Rating")
+p.affect + labs(fill = "Age Group") + scale_fill_brewer(palette = "Paired")
+```
+
+## Current Activities 
+
+``` {r currentactivities, echo = TRUE}
+#Individual pie chart for item "What are you doing right now"
+activities.string <- paste(EMA.clean$activities, collapse = "," )
+activity.vector <- str_split(activities.string, ',')[[1]]
+activity.clean <- data_frame(activity.vector)
+activity_freq <- activity.clean %>% group_by(activity.vector) %>% tally() %>% filter(activity.vector !="") %>%
+  rename(activity = activity.vector) %>%
+  mutate(percentage = (n / sum(n))*100)
+activity_freq$activity <- factor(activity_freq$activity, levels=c(1,2,14,12,16,4,7,20,21,6,19,10,8,5,15,9,3,13,17,18,11), labels=c("Eating or Drinking","TV", "Computer", "In Transit", "Reading", "Socializing", "Sleeping", "Chores","Listening to Speech", "Work", "Hygiene", "Cooking", "Errands", "Exercise", "Radio", "Cleaning", "Entertainment", "Nothing in Particular", "School", "Volunteering", "Doctor's Appointment"))
+
+kable(activity_freq, caption =  "Frequency of Current Activities")
+
+p.activities <- ggplot(activity_freq, aes(x = activity, y= percentage)) +
+ theme(plot.title = element_text(hjust = 0.5), panel.grid.major = element_blank(), panel.grid.minor = element_blank(), panel.background = element_blank(), axis.line = element_line(colour = "black"), axis.text.x = element_text(angle = 45, hjust = 1)) +
+  geom_bar(stat="identity", position=position_dodge()) +
+  xlab("Activity") + ylab("Percentage of Time Spent in  Activity")
+p.activities
+```
+
+## Mental Demand of Current Activities
+
+``` {r cogeffort, echo = TRUE}
+#create data frame of mental demand ratings
+m.demand <- EMA.clean %>% select(SubID,agegroup, starts_with("demand_")) %>%
+  pivot_longer(names_to = "category", values_to = "rating", -c(SubID, agegroup)) %>%
+  separate(col = category, into=c(NA,"Category"), sep = "_") 
+
+#summarizing average mental demand of activities across all participants
+m.demand.subj <-m.demand %>% group_by(SubID,agegroup,Category) %>% filter(Category != "school") %>%
+  dplyr::summarise(mean.demand = mean(rating, na.rm = T))
+
+m.demand.subj.av <-m.demand %>% group_by(SubID, agegroup) %>% filter(Category != "school") %>%
+  dplyr::summarise(mean.demand = mean(rating, na.rm = T))
+
+m.demand.av <-m.demand %>% group_by(Category) %>%
+  dplyr::summarise(mean.demand = mean(rating, na.rm = T))
+m.demand.sum <- summarySEwithin2(m.demand.subj, measurevar = "mean.demand", withinvars = c("Category"), betweenvars = "agegroup", idvar = "SubID")
+m.demand.subj.sum <- summarySEwithin2(m.demand.subj, measurevar = "mean.demand", betweenvars = "SubID", idvar = "SubID")
+
+#plotting mental demand associated with each of the surveyed activities
+p.mental.demand <- ggplot(m.demand.sum, aes(x = Category, y= mean.demand, fill=agegroup)) +
+ theme(plot.title = element_text(hjust = 0.5), panel.grid.major = element_blank(), panel.grid.minor = element_blank(), panel.background = element_blank(), axis.line = element_line(colour = "black"), axis.text.x = element_text(angle = 45, hjust = 1)) +
+  geom_bar(stat="identity", position=position_dodge()) +
+  geom_errorbar(position=position_dodge(width=0.9), aes(ymin=mean.demand-se, ymax=mean.demand+se), width=.2) +
+  coord_cartesian(ylim=c(1,3.5)) +
+  xlab("Activity") + ylab("Mental Demand") + ggtitle("Average Mental Demand of Activities")
+p.mental.demand + labs(fill = "Age Group") + scale_fill_brewer(palette = "Paired")
+
+p.mental.demand.subj <- ggplot(m.demand.subj.av, aes(x = SubID, y= mean.demand, fill=agegroup)) +
+ theme(plot.title = element_text(hjust = 0.5), panel.grid.major = element_blank(), panel.grid.minor = element_blank(), panel.background = element_blank(), axis.line = element_line(colour = "black")) +
+  geom_bar(stat="identity", position=position_dodge()) +
+    coord_cartesian(ylim=c(1,3)) +
+  xlab("ID") + ylab("Mental Demand") + ggtitle("Average Mental Demand of Each Participant")
+p.mental.demand.subj + labs(fill = "Age Group") + scale_fill_brewer(palette = "Paired")
+#plotting mental demand as a frequency of reported daily life activities
+m.demand.sum$Category <- factor(m.demand.sum$Category, levels = c("work", "volunteer", "doctor", "transit", "social", "exercise", "computer", "cleaning", "entertain", "cooking", "reading", "errand", "chores", "radio", "hygeine", "tv", "nothing", "eat", "sleep"), labels = c("Work", "Volunteering", "Doctor's Appt.", "In Transit", "Socializing", "Exercising", "Computer", "Cleaning", "Entertainment", "Cooking", "Reading", "Errands", "Chores", "Radio", "Hygiene", "TV", "Nothing in Particular", "Eating/Drinking", "Sleeping"))
+
+#tabulating frequency of mental demand ratings (from 5-point likert scale)
+m.demand$rating <- factor(m.demand$rating, levels=c(1,2,3,4,5), labels = c("Not at All","A Little Bit","Moderately", "Quite a Bit", "Extremely"))  
+m.demand.freq <- m.demand %>% group_by(rating) %>% tally() %>% filter(rating != "NA")
+
+kable(m.demand.freq, caption =  "Frequency of 'Mental Demand' Responses for Current Activities")
+
+#plotting frequency of mental demand in daily life
+m.demand.frequency <- ggplot(m.demand.freq, aes(x = rating, y= n)) +
+ theme(plot.title = element_text(hjust = 0.5), panel.grid.major = element_blank(), panel.grid.minor = element_blank(), panel.background = element_blank(), axis.line = element_line(colour = "black")) + scale_x_discrete(limits=c("Not at All","A Little Bit","Moderately", "Quite a Bit", "Extremely")) +
+  geom_bar(stat="identity", position=position_dodge()) + ggtitle("Mental Demand of Activities") + xlab("Mental Demand") + ylab("Frequency")
+m.demand.frequency
+```
+
+## Social Engagement -- Social Partners
+
+``` {r currentSocial, echo = TRUE}
+EMA.clean$social_partner <- factor(EMA.clean$social_partner, levels=c(1,2,3,4,5,6), labels=c("Alone","Coworker","Friend", "Family Member", "Spouse/partner","Stranger"))
+Social_freq <- EMA.clean %>% select(social_partner) %>% group_by(social_partner) %>% tally() %>% filter(social_partner != "NA")
+
+kable(Social_freq, caption =  "Frequency of Social Engagement")
+
+social_plot <- ggplot(Social_freq, aes(x = social_partner , y= n)) +
+ theme(plot.title = element_text(hjust = 0.5), panel.grid.major = element_blank(), panel.grid.minor = element_blank(), panel.background = element_blank(), axis.line = element_line(colour = "black")) +
+  geom_bar(stat="identity", position=position_dodge()) + ggtitle("Daily Life Social Engagement (Social Partner Type)") + xlab("") + ylab("Frequency")
+social_plot
+```
+
+```{r CogEDEMA, echo=TRUE, message=FALSE, warning=FALSE}
+Cog_ED_ind_SV$SubID = Cog_ED_ind_SV$subjectid
+CogED.EMA <- inner_join(Cog_ED_ind_SV, m.demand.subj.av, by="SubID")
+
+#Plotting SV Gain and average mental demand across both YAs and OAs
+p.SV.EMA <-  ggplot(CogED.EMA, aes(meanSV_gain, mean.demand)) +
+   theme(plot.title = element_text(hjust = 0.5), panel.grid.major = element_blank(), panel.grid.minor = element_blank(), panel.background = element_blank(), axis.line = element_line(colour = "black")) +
+  geom_point(aes(colour = agegroup.x)) + geom_smooth(method=lm) +ggtitle("Cog-ED and Daily Life Effort") +
+    xlab("SV Gain") + ylab("Average Mental Demand")
+p.SV.EMA + scale_colour_brewer(palette = "Paired", "Age Group")
+
+#correlation between CogED & EMA demand
+cor.test(CogED.EMA$meanSV_gain, CogED.EMA$mean.demand)
+```

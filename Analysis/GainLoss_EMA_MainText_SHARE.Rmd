@@ -1,0 +1,281 @@
+---
+title: "Cognitive effort-based decision-making across experimental and daily life indices in younger and older adults"
+author: "Jennifer L. Crawford"
+date: "`r Sys.Date()`"
+output:
+  html_document: default
+  code_folding: "hide"
+---
+## Examine framing effects on effort-based decision-making in younger and older adults
+
+```{r setup, warning=FALSE, message=FALSE}
+rm(list=ls())
+
+# Packages
+library(correlation); library(lme4); library(lmerTest); library(sjstats); library(sjPlot); library(ggeffects); library(ggpubr); library(knitr); library(RColorBrewer); library(tidyverse);
+source("summarySEwithin2.R")
+
+#Create data directories
+coged.path<-"https://raw.githubusercontent.com/jlcrawford/OA_CogED_online/master/Data/gain_loss_coged_SHARE.csv"
+coged.full.path <-"https://raw.githubusercontent.com/jlcrawford/OA_CogED_online/master/Data/gain_loss_coged_full_SHARE.csv"
+EMA.path <- "https://raw.githubusercontent.com/jlcrawford/OA_CogED_online/master/Data/CogEffort_ExpSamp_SHARE.csv"
+
+#Make data frames for Cog-ED
+coged<- read.csv(coged.path, header = T)
+coged.full <-read.csv(coged.full.path, header = T)
+```
+
+```{r, Demo, warning = F, message = F}
+#Pulling out participant IDs for completed Cog-ED runs
+Subject.IDs <- coged %>% filter(completed == 1) %>% select(subjectid) %>% distinct(subjectid, .keep_all = TRUE)
+```
+
+```{r SV_CogED, warning=F, message=F}
+#clean data frame with Cog-ED SV estimates and transform data across so that SV estimates are equivalent across both domains (i.e., gain, loss)
+d.coged <- coged %>% distinct(subjectid, .keep_all = TRUE) %>% inner_join(Subject.IDs, by = "subjectid") %>% select(subjectid, ageGroup, taskOrder, IP12_1, IP12_2, IP12_3, IP13_1, IP13_2, IP13_3, IP14_1, IP14_2, IP14_3,IP12_1_loss, IP12_2_loss, IP12_3_loss, IP13_1_loss, IP13_2_loss, IP13_3_loss, IP14_1_loss, IP14_2_loss, IP14_3_loss, hitrate_N1, hitrate_N2, hitrate_N3, hitrate_N4, CRrate_N1, CRrate_N2, CRrate_N3, CRrate_N4) %>%
+  group_by(subjectid, ageGroup) %>%
+  mutate(SV_red__gain = (IP12_1/2 + IP12_2/3 + IP12_3/4)/3,
+         SV_blue__gain = (IP13_1/2 + IP13_2/3 + IP13_3/4)/3,
+         SV_purple__gain = (IP14_1/2 + IP14_2/3 + IP14_3/4)/3,
+         SV_red__loss = ((IP12_1_loss/2 + IP12_2_loss/3 + IP12_3_loss/4)/3)*-1,
+         SV_blue__loss = ((IP13_1_loss/2 + IP13_2_loss/3 + IP13_3_loss/4)/3)*-1,
+         SV_purple__loss = ((IP14_1_loss/2 + IP14_2_loss/3 + IP14_3_loss/4)/3)*-1, 
+         mean_HitRate = (hitrate_N1 + hitrate_N2 + hitrate_N3 + hitrate_N4)/4,
+         meanCRrate = (CRrate_N1 + CRrate_N2 + CRrate_N3 + CRrate_N4)/4, 
+         ACC = (mean_HitRate + meanCRrate)/2)
+
+d.coged.SV <- d.coged %>% select(subjectid, ageGroup, taskOrder, SV_red__gain, SV_blue__gain, SV_purple__gain, SV_red__loss, SV_blue__loss, SV_purple__loss, mean_HitRate) %>%
+  pivot_longer(names_to = "tmp", values_to = "SV", -c(subjectid, ageGroup, taskOrder, mean_HitRate)) %>%
+  separate(col = tmp, into=c("Task","Condition"), sep = "__") %>%
+  separate(col = Task, into=c(NA,"Task"), sep = "_") %>%
+  mutate(Condition = factor(Condition, levels = c("gain","loss"), labels = c("Gain","Loss")),
+         taskCode = factor(Task, levels=c("red","blue","purple"), labels=c(-1,0,1)),
+         conditionCode = factor(Condition, levels = c("Gain","Loss"), labels = c(0,1)),
+         ageCode = factor(ageGroup, levels = c("Young", "Old"), labels = c(0,1)),
+         orderCode = factor(taskOrder, levels = c(1,2), labels = c(0,1)))
+d.coged.SV$taskCode <- as.numeric(as.character(d.coged.SV$taskCode))
+d.coged.SV$conditionCode <- as.numeric(as.character(d.coged.SV$conditionCode))
+d.coged.SV$ageCode <- as.numeric(as.character(d.coged.SV$ageCode))
+d.coged.SV$orderCode <- as.numeric(as.character(d.coged.SV$orderCode))
+```
+
+## Cognitive Effort Discounting
+
+```{r CogED_Plot, warning = F, message = F}
+CogED_sum <- summarySEwithin2(d.coged.SV, measurevar = "SV", withinvars = c("Task","Condition"), betweenvars = "ageGroup", idvar = "subjectid")
+CogED_sum$Task <- factor(CogED_sum$Task, levels = c("red","blue","purple"), labels = c("2-Back","3-Back","4-Back"))
+
+CogED_order_sum <- summarySEwithin2(d.coged.SV, measurevar = "SV", withinvars = c("Task","Condition"), betweenvars = c("taskOrder", "ageGroup"), idvar = "subjectid")
+CogED_order_sum$Task <- factor(CogED_order_sum$Task, levels = c("red","blue","purple"), labels = c("2-Back","3-Back","4-Back"))
+
+d.coged.SV$Task <- factor(d.coged.SV$Task, levels = c("red","blue","purple"), labels = c("2-Back","3-Back","4-Back"))
+```
+
+## Figure 1: Cognitive effort discounting across gain and loss incentive contexts in younger and older adults
+
+```{r Fig1, warning=FALSE, message=FALSE}
+#Plotting SV across both gain and loss domains
+inaug_2021 <- c("#5445b1", "#749dae", "#f3c483", "#5c1a33", "#cd3341","#f7dc6a")
+
+fig.1 <- ggplot(CogED_sum, aes(x=Task, y=SV, fill=Task)) + 
+  theme(plot.title = element_text(hjust = 0.5), panel.grid.major = element_blank(), panel.grid.minor = element_blank(), panel.background = element_blank(), axis.line = element_line(colour = "black")) +
+  geom_point(data = d.coged.SV, aes(x=Task, y=SV, color=Task),
+             stat="identity", alpha=0.7, position = "jitter") +
+  geom_bar(stat="identity", position=position_dodge(), alpha = .6) +
+  geom_errorbar(position=position_dodge(width=0.9), aes(ymin=SV-ci, ymax=SV+ci), width=.2, size=1.1) + 
+  coord_cartesian(ylim=c(0,1)) +
+  scale_x_discrete(breaks=NULL) +
+  xlab("") + ylab("Subjective Value") + facet_grid(.~Condition + ageGroup) +
+  scale_color_manual(values = inaug_2021) + scale_fill_manual(values = inaug_2021)
+fig.1
+```
+
+## Summarizing effects of task level, condition, and age group on discounting (SV estimates)
+
+```{r MLM_CogED_SV, warning=FALSE, message=FALSE}
+#multilevel model of SV (DV) with task level, condition (gain, loss), and age (young, old)
+m.coged <- lmer(data = d.coged.SV, SV ~ taskCode*conditionCode*ageCode + (1 | subjectid))
+summary(m.coged)
+
+#breaking down the task x condition interaction
+test.2back <- t.test(data = d.coged.SV %>% filter(taskCode == -1), SV ~ conditionCode, paired = T)
+test.2back
+test.3back <- t.test(data = d.coged.SV %>% filter(taskCode == 0), SV ~ conditionCode, paired = T)
+test.3back
+test.4back <- t.test(data = d.coged.SV %>% filter(taskCode == 1), SV ~ conditionCode, paired = T)
+test.4back
+
+#Creating data frame with average subjective value estimates in gain and loss domains
+Cog_ED_ind_SV <- d.coged %>%
+  mutate(meanSV_gain = (SV_red__gain + SV_blue__gain + SV_purple__gain)/3,
+         meanSV_loss = (SV_red__loss + SV_blue__loss + SV_purple__loss)/3, 
+         mean_HitRate = (hitrate_N1 + hitrate_N2 + hitrate_N3 + hitrate_N4)/4,
+         LossGain_diff = meanSV_loss-meanSV_gain,
+         GainLoss_diff = meanSV_gain-meanSV_loss)
+
+#Calculating correlation across gain & loss incentive contexts
+corr.YA.GainLoss <- cor_test(data = Cog_ED_ind_SV %>% filter(ageGroup == "Young"), "meanSV_gain", "meanSV_loss")
+corr.YA.GainLoss
+
+corr.OA.GainLoss <- cor_test(data = Cog_ED_ind_SV %>% filter(ageGroup == "Old"), "meanSV_gain", "meanSV_loss")
+corr.OA.GainLoss
+```
+
+### Adding task order to the models predicting SV
+#### 1= Gain first, Loss Second; 2= Loss first, Gain second
+
+```{r orderEffects, warning = F, message = F}
+#testing for order effects in SV estimates
+m.coged.order <- lmer(data = d.coged.SV, SV ~ taskCode*conditionCode*ageCode + orderCode + (1 | subjectid))
+summary(m.coged.order)
+```
+
+## Table 1: The effects of task level, condition, age group, and task order on subjective value
+
+```{r Table1, warning=FALSE, message=FALSE}
+table.1 <- tab_model(m.coged, m.coged.order, show.stat = TRUE, file = "table1.doc")
+table.1
+```
+
+### Exploratory Analysis: Extracting residuals from linear model of loss SV estimates predicting gain SV estimates
+
+```{r, RewardMotiv, warning=FALSE, message=FALSE}
+m.coged.resid <- lm(data = Cog_ED_ind_SV, meanSV_gain ~ meanSV_loss)
+summary(m.coged.resid)
+coged.resids <- (summary(m.coged.resid))$residuals
+Cog_ED_ind_SV$coged.resids <- coged.resids
+```
+
+# EMA Data
+
+```{r importdata, echo = TRUE}
+#Import concatenated EMA data
+codebook.path <- "https://raw.githubusercontent.com/jlcrawford/OA_CogED_online/master/Data/Codebook.csv"
+codebook <- read.csv(codebook.path, header = T)
+#create list of new variable names from codebook
+new.names <- codebook$new_itemname
+
+#read in EMA data
+EMA<- read.csv(EMA.path, header = T) %>% inner_join(Subject.IDs, by = "subjectid")
+
+#clean up extraneous variables from Qualtrics survey
+EMA.clean <- EMA %>% select(-c(EndDate, RecordedDate, Status, IPAddress, Progress, Finished, ResponseId, RecipientLastName, RecipientFirstName, RecipientEmail, ExternalReference,LocationLatitude,LocationLongitude, DistributionChannel, UserLanguage, SC0)) %>%
+  setNames(new.names) %>%
+  separate(date, c("date", "time"), sep = " ") %>%
+  mutate(Date = as.Date.character(date, "%m/%d/%y"),
+         day = weekdays(Date),
+         timeDay = if_else(time < 12, "morning", if_else(time > 18, "evening", "afternoon")))
+```
+
+## Summarizing the average number of activities endorsed per ping
+
+```{r Activities, warning=FALSE, message=FALSE}
+EMA.activities <- EMA.clean %>% select(subjectid, day, timeDay, activities) %>% filter(activities > 0) %>%
+  mutate(activities.count = count.fields(textConnection(activities), sep = ","))
+EMA.activities.sum <- EMA.activities %>% summarise(mean.activities = mean(activities.count), sd.activities = sd(activities.count), range.activities = range(activities.count))
+```
+
+## Mental Demand of Current Activities
+
+```{r cogeffort, echo = TRUE}
+#create data frame of mental demand ratings
+m.demand <- EMA.clean %>% select(subjectid,ageGroup,time,timeDay,day,starts_with("demand_")) %>%
+  pivot_longer(names_to = "category", values_to = "rating", -c(subjectid, ageGroup, time, timeDay, day)) %>%
+  separate(col = category, into=c(NA,"Category"), sep = "_") 
+
+#summarizing average mental demand of activities across all participants
+m.demand.subj.av <-m.demand %>% group_by(subjectid, ageGroup) %>%
+  summarise(count.demand = sum(!is.na(rating)),
+         mean.demand = mean(rating, na.rm=T),
+         iSD.demand = sd(rating, na.rm=T)) %>%
+  filter(count.demand > 3)
+
+m.demand.subj.IDs <- m.demand.subj.av %>% select(subjectid)
+
+#testing for effects of SV and level-1 predictors (e.g., time of day, day of week) on mental demand ratings
+m.demand.clean <- m.demand %>%
+  mutate(ageCode = factor(m.demand$ageGroup, levels = c("Young", "Old"), labels = c(0,1)),
+         dayCode = factor(day, levels = c("Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"),
+                          labels = c(0,1,2,3,4,5,6)),
+         timeCode = factor(timeDay, levels = c("morning","afternoon","evening"), 
+                           labels = c(-1,0,1))) %>%
+  filter(!is.na(rating)) %>% inner_join(Cog_ED_ind_SV) %>% inner_join(m.demand.subj.IDs) %>%
+  mutate(meanSV_gain_c = scale(meanSV_gain, center = T, scale = F),
+         meanSV_loss_c = scale(meanSV_loss, center = T, scale = F))
+m.demand.clean$rating <- as.numeric(as.character(m.demand.clean$rating))
+m.demand.clean$ageCode <- as.numeric(as.character(m.demand.clean$ageCode))
+m.demand.clean$dayCode <- as.numeric(as.character(m.demand.clean$dayCode))
+m.demand.clean$timeCode <- as.numeric(as.character(m.demand.clean$timeCode))
+
+#null model of mental demand
+m.mental.demand <- lmer(data = m.demand.clean, rating ~ 1 + (1 | subjectid))
+summary(m.mental.demand)
+icc(m.mental.demand)
+
+# age + day of the week + time of the day + average Gain SV + average Loss SV (with age interactions) predicting mental demand
+m.mental.demand.age.timeDay.Gainloss.int<- lmer(data = m.demand.clean, rating ~ ageCode + dayCode + timeCode + meanSV_gain_c*ageCode + meanSV_loss_c*ageCode + (1 | subjectid))
+summary(m.mental.demand.age.timeDay.Gainloss.int)
+
+# age + day of the week + time of the day + average Gain SV + average Loss SV (with age interactions) predicting mental demand (YAs ONLY)
+m.mental.demand.age.timeDay.Gainloss.int.YA<- lmer(data = m.demand.clean %>% filter(ageCode ==0), rating ~ dayCode + timeCode + meanSV_gain_c + meanSV_loss_c + (1 | subjectid))
+summary(m.mental.demand.age.timeDay.Gainloss.int.YA)
+
+# age + day of the week + time of the day + average Gain SV + average Loss SV (with age interactions) predicting mental demand (OAs ONLY)
+m.mental.demand.age.timeDay.Gainloss.int.OA<- lmer(data = m.demand.clean %>% filter(ageCode ==1), rating ~ dayCode + timeCode + meanSV_gain_c + meanSV_loss_c + (1 | subjectid))
+summary(m.mental.demand.age.timeDay.Gainloss.int.OA)
+```
+
+## Table 2: Effects of age, day of week, time of day, and subjective value on daily life mental demand
+
+```{r table2, warning=FALSE, message=FALSE}
+table.2 <- tab_model(m.mental.demand.age.timeDay.Gainloss.int, m.mental.demand.age.timeDay.Gainloss.int.YA, m.mental.demand.age.timeDay.Gainloss.int.OA, show.stat = TRUE, file = "table2.doc")
+table.2
+```
+
+## Figure 2: Relationships between the costs of cognitive effort and daily life mental demand across gain and loss incentive contexts
+
+```{r CogEDEMA, echo=TRUE, message=FALSE, warning=FALSE}
+#extracting predicted values from multilevel model (gain)
+CogED.gain.EMA <- ggpredict(m.mental.demand.age.timeDay.Gainloss.int, terms = c("meanSV_gain_c", "ageCode"))
+p.gain.EMA <- ggplot(CogED.gain.EMA, aes(x, predicted, colour=group)) +
+  geom_ribbon(aes(ymin = conf.low, ymax = conf.high), linetype = 0, alpha=.1) +
+  geom_line(size =1) + theme_classic() +
+  scale_colour_brewer(palette = "Paired", "Age Group", labels = c("Younger","Older")) + labs(x="Subjective Value (Gain)",
+                                                                                                              y="Predicted Mental Demand") 
+#extracting predicted values from multilevel model (loss)
+CogED.loss.EMA <- ggpredict(m.mental.demand.age.timeDay.Gainloss.int, terms = c("meanSV_loss_c", "ageCode"))
+p.loss.EMA <- ggplot(CogED.loss.EMA, aes(x, predicted, colour=group)) +
+  geom_ribbon(aes(ymin = conf.low, ymax = conf.high), linetype = 0, alpha=.1) +
+  geom_line(size =1) + theme_classic() +
+  scale_colour_brewer(palette = "Paired", "Age Group", labels = c("Younger","Older")) + labs(x="Subjective Value (Loss)",
+                                                                                                              y="Predicted Mental Demand") 
+fig.2 <- ggarrange(p.gain.EMA, p.loss.EMA, labels = c("A", "B"), common.legend = TRUE)
+fig.2
+```
+
+## Exploratory Analyses: reward motivation effects on daily life mental demand
+
+```{r rewardMotive_EMA, warning=FALSE, message=FALSE}
+# age + day of the week + time of the day + reward motivation residuals predicting mental demand
+m.mental.demand.age.timeDay.resid <- lmer(data = m.demand.clean, rating ~ ageCode + dayCode + timeCode + coged.resids + (1 | subjectid))
+summary(m.mental.demand.age.timeDay.resid)
+
+# age + day of the week + time of the day + reward motivation residuals (+ age interaction) predicting mental demand
+m.mental.demand.age.timeDay.resid.int <- lmer(data = m.demand.clean, rating ~ ageCode + dayCode + timeCode +  coged.resids*ageCode + (1 | subjectid))
+summary(m.mental.demand.age.timeDay.resid.int)
+
+# age + day of the week + time of the day + reward motivation residuals predicting mental demand (YAs ONLY)
+m.mental.demand.age.timeDay.resid.YA <- lmer(data = m.demand.clean %>% filter(ageCode == 0), rating ~ dayCode + timeCode + coged.resids + (1 | subjectid))
+summary(m.mental.demand.age.timeDay.resid.YA)
+
+# age + day of the week + time of the day + reward motivation residuals predicting mental demand (OAs ONLY)
+m.mental.demand.age.timeDay.resid.OA <- lmer(data = m.demand.clean %>% filter(ageCode == 1), rating ~ dayCode + timeCode + coged.resids + (1 | subjectid))
+summary(m.mental.demand.age.timeDay.resid.OA)
+```
+
+## Table 3: Effects of age, day of week, time of day, and reward motivation on daily life mental demand
+
+```{r table3, warning=FALSE, message=FALSE}
+table.3 <- tab_model(m.mental.demand.age.timeDay.resid.int, m.mental.demand.age.timeDay.resid.YA, m.mental.demand.age.timeDay.resid.OA, show.stat = TRUE, file = "table3.doc")
+table.3
+```

@@ -1,0 +1,239 @@
+---
+title: 'Supplemental Materials: Cognitive effort-based decision-making across experimental and daily life indices in younger and older adults'
+author: "Jennifer L. Crawford"
+date: "`r Sys.Date()`"
+output:
+  html_document: 
+    code_folding: hide
+---
+
+```{r setup, warning=FALSE, message=FALSE}
+rm(list=ls())
+
+# Packages
+library(lme4); library(lmerTest); library(sjstats); library(sjPlot); library(ggeffects); library(ggpubr); library(knitr); library(RColorBrewer); library(tidyverse);
+source("summarySEwithin2.R")
+
+#Create data directories
+coged.path<-"https://raw.githubusercontent.com/jlcrawford/OA_CogED_online/master/Data/gain_loss_coged_SHARE.csv"
+coged.full.path <-"https://raw.githubusercontent.com/jlcrawford/OA_CogED_online/master/Data/gain_loss_coged_full_SHARE.csv"
+EMA.path <- "https://raw.githubusercontent.com/jlcrawford/OA_CogED_online/master/Data/CogEffort_ExpSamp_SHARE.csv"
+
+#Make data frames for Cog-ED
+coged<- read.csv(coged.path, header = T)
+coged.full <-read.csv(coged.full.path, header = T)
+```
+
+```{r, Demo, warning = F, message = F}
+#Pulling out participant IDs for completed Cog-ED runs
+Subject.IDs <- coged %>% filter(completed == 1) %>% select(subjectid) %>% distinct(subjectid, .keep_all = TRUE)
+```
+
+## Participant demographic information
+
+As reported in the main text of the manuscript, the full sample demographics is as follows: 310 participants (190 females; Mean age =  26.2, SD= 6.3 [younger adults]; Mean age = 65.6, SD = 5.2 [older adults]; 1 American Indian or Alaskan Native, 13 Asian, 30 Black or African American, 252 White, 14 more than 1 race; 29 Hispanic or Latinx). For the EMA sample, the demographics are as follows: 230 participants (145 females; Mean age =  26.1, SD= 6.3 [younger adults]; Mean age = 65.5, SD = 5.2 [older adults]; 1 American Indian or Alaskan Native, 11 Asian, 21 Black or African American, 188 White, 9 more than 1 race; 23 Hispanic or Latinx).
+
+## Summarizing N-Back performance (from familiarization phase)
+
+Participants first completed a familiarization phase in which they performed four levels of the N-Back (N= 1-4) in ascending order. Within each block of the N-Back, there were 20 trials, 25% of which were targets (i.e., 5 target trials per level of N). Below, we have summarized the accuracy (hit rate) and reaction time (milliseconds) for each age group. We do observe differences in task performance with respect to hit rate across levels of task difficulty, but not age group. However, overall, older adults are slower than younger adults. Although the findings with regard to age group and hit rate are not necessarily expected, we suspect this is due to potentially higher performing older adults and lower performing younger adults, relative to the samples that are normally studied in the laboratory environment. Furthermore, the number of trials of each level of N, was designed to familiarize participants with each level of the task, but is not ideal for conducting in-depth analyses of N-Back performance (i.e., each level of N only has 5 target trials). Taken together, the N-Back performance findings should be considered cautiously.
+
+```{r NBack_performance, message=FALSE, warning=FALSE}
+#clean data frame with Cog-ED SV estimates and transform data across so that SV estimates are equivalent across both domains (i.e., gain, loss)
+d.coged <- coged %>% distinct(subjectid, .keep_all = TRUE) %>% inner_join(Subject.IDs, by = "subjectid") %>% select(subjectid, ageGroup, taskOrder, IP12_1, IP12_2, IP12_3, IP13_1, IP13_2, IP13_3, IP14_1, IP14_2, IP14_3,IP12_1_loss, IP12_2_loss, IP12_3_loss, IP13_1_loss, IP13_2_loss, IP13_3_loss, IP14_1_loss, IP14_2_loss, IP14_3_loss, hitrate_N1, hitrate_N2, hitrate_N3, hitrate_N4) %>%
+  group_by(subjectid, ageGroup) %>%
+  mutate(SV_red__gain = (IP12_1/2 + IP12_2/3 + IP12_3/4)/3,
+         SV_blue__gain = (IP13_1/2 + IP13_2/3 + IP13_3/4)/3,
+         SV_purple__gain = (IP14_1/2 + IP14_2/3 + IP14_3/4)/3,
+         SV_red__loss = ((IP12_1_loss/2 + IP12_2_loss/3 + IP12_3_loss/4)/3)*-1,
+         SV_blue__loss = ((IP13_1_loss/2 + IP13_2_loss/3 + IP13_3_loss/4)/3)*-1,
+         SV_purple__loss = ((IP14_1_loss/2 + IP14_2_loss/3 + IP14_3_loss/4)/3)*-1, 
+         mean_HitRate = (hitrate_N1 + hitrate_N2 + hitrate_N3 + hitrate_N4)/4)
+
+#summarizing N-Back performance
+d.NBack <- d.coged %>% select(subjectid, ageGroup, hitrate_N1, hitrate_N2, hitrate_N3, hitrate_N4) %>%
+  pivot_longer(names_to = "tmp", values_to = "Performance", -c(subjectid, ageGroup)) %>%
+  separate(col = tmp, into=c("TaskAttrib","Task"), sep = "_") %>%
+  mutate(taskCode = factor(Task, levels = c("N1","N2","N3","N4"), labels = c(0,1,2,3)),
+         ageCode = factor(ageGroup, levels = c("Young","Old"), labels = c(0,1)))
+d.NBack$taskCode <- as.numeric(as.character(d.NBack$taskCode))
+d.NBack$ageCode <- as.numeric(as.character(d.NBack$ageCode))
+
+sum.NBack <- summarySEwithin2(data = d.NBack, measurevar = "Performance", withinvars = "Task", betweenvars = "ageGroup", idvar = "subjectid")
+
+sum.NBack$Task <- factor(sum.NBack$Task, levels = c("N1","N2","N3","N4"), labels = c("1back","2back","3back","4back"))
+p.nback <- ggplot(sum.NBack, aes(x=Task, y=Performance, fill=ageGroup)) + 
+  theme(plot.title = element_text(hjust = 0.5), panel.grid.major = element_blank(), panel.grid.minor = element_blank(), panel.background = element_blank(), axis.line = element_line(colour = "black")) +
+  geom_bar(stat="identity", position=position_dodge(), alpha=.45, size=1.1) +
+  geom_errorbar(position=position_dodge(width=0.9), aes(ymin=Performance-ci, ymax=Performance+ci), width=.2, size=1.1) +  
+  xlab("N-Back Level") + ylab("Accuracy") + ggtitle("N-Back Performance (Hit Rate)")
+p.nback + labs(fill = "Age Group") + scale_fill_brewer(palette = "Paired")
+
+#model of N-Back hit rate predicted by task level and age group
+m.nback.HR <- lmer(data = d.NBack, Performance ~ taskCode + ageCode + (1| subjectid))
+tab_model(m.nback.HR)
+
+#summarizing N-Back performance
+d.NBack.RT <- coged.full %>% rename(subjectid = "subject") %>% select(subjectid, ageGroup, blockcode, phase, correct, latency) %>%
+  filter(phase == 1) %>% filter(blockcode != "ratingSummary") %>% filter(blockcode != "nbackIntro") %>%
+  group_by(subjectid, ageGroup, blockcode) %>% summarise(Acc = sum(correct)/20, RT = mean(latency)) %>% inner_join(Subject.IDs)
+d.NBack.RT$taskCode <- factor(d.NBack.RT$blockcode, levels = c("1back","2back","3back","4back"), labels = c(0,1,2,3))
+d.NBack.RT$taskCode <- as.numeric(as.character(d.NBack.RT$taskCode))
+d.NBack.RT$ageCode <- factor(d.NBack.RT$ageGroup, levels = c("Young","Old"), labels = c(0,1))
+d.NBack.RT$ageCode <- as.numeric(as.character(d.NBack.RT$ageCode))
+
+sum.NBack.RT <- summarySEwithin2(data = d.NBack.RT, measurevar = "RT", withinvars = "blockcode", betweenvars = "ageGroup", idvar = "subjectid")
+
+p.nback.RT <- ggplot(sum.NBack.RT, aes(x=blockcode, y=RT, fill=ageGroup)) + 
+  theme(plot.title = element_text(hjust = 0.5), panel.grid.major = element_blank(), panel.grid.minor = element_blank(), panel.background = element_blank(), axis.line = element_line(colour = "black")) +
+  geom_bar(stat="identity", position=position_dodge(), alpha=.45, size=1.1) +
+  geom_errorbar(position=position_dodge(width=0.9), aes(ymin=RT-ci, ymax=RT+ci), width=.2, size=1.1) +  
+  xlab("N-Back Level") + ylab("RT (ms)") + ggtitle("N-Back Performance (RT)")
+p.nback.RT + labs(fill = "Age Group") + scale_fill_brewer(palette = "Paired")
+
+#model of N-Back RT predicted by task level and age group
+m.nback.RT <- lmer(data = d.NBack.RT, RT ~ taskCode + ageCode + (1| subjectid))
+tab_model(m.nback.RT)
+```
+
+## Adding N-Back performance to the models predicting Subjective Value (SV)
+
+In additional exploratory analyses we controlled for the familiarization phase performance variables (e.g., N-Back hit rate, reaction time) when modeling the relationship between variables of interest (e.g., task level, condition, age group) and the costs of cognitive effort. We did not find any evidence that hit rate was a significant predictor of cognitive effort costs, B = 0.04 [-0.12, 0.19], t = 0.45, p = 0.655. In contrast, we did find an effect of reaction time on cognitive effort costs, B = 0.17 [0.05, 0.28], t = 2.90, p = 0.004, wherein participants who performed the N-Back more slowly had higher subjective value estimates (i.e., lower cognitive effort costs). Nevertheless, and most critically, even when controlling for these performance variables, we still observed the previously reported effects of task level, condition, age group, and the task level × condition interaction on subjective value, ps < 0.011 (see Table below), demonstrating that cognitive effort costs cannot be explained only by task performance. 
+
+```{r NBack_SV, message=FALSE, warning=FALSE}
+d.coged.SV <- d.coged %>% select(subjectid, ageGroup, taskOrder, SV_red__gain, SV_blue__gain, SV_purple__gain, SV_red__loss, SV_blue__loss, SV_purple__loss, mean_HitRate) %>%
+  pivot_longer(names_to = "tmp", values_to = "SV", -c(subjectid, ageGroup, taskOrder, mean_HitRate)) %>%
+  separate(col = tmp, into=c("Task","Condition"), sep = "__") %>%
+  separate(col = Task, into=c(NA,"Task"), sep = "_") %>%
+  mutate(Condition = factor(Condition, levels = c("gain","loss"), labels = c("Gain","Loss")),
+         taskCode = factor(Task, levels=c("red","blue","purple"), labels=c(-1,0,1)),
+         conditionCode = factor(Condition, levels = c("Gain","Loss"), labels = c(0,1)),
+         ageCode = factor(ageGroup, levels = c("Young", "Old"), labels = c(0,1)),
+         orderCode = factor(taskOrder, levels = c(1,2), labels = c(0,1)))
+d.coged.SV$taskCode <- as.numeric(as.character(d.coged.SV$taskCode))
+d.coged.SV$conditionCode <- as.numeric(as.character(d.coged.SV$conditionCode))
+d.coged.SV$ageCode <- as.numeric(as.character(d.coged.SV$ageCode))
+d.coged.SV$orderCode <- as.numeric(as.character(d.coged.SV$orderCode))
+
+d.NBack.RT.ind <- d.NBack.RT %>% group_by(subjectid) %>% summarise(meanRT = mean(RT)) %>%
+                        mutate(meanRT_s = meanRT/1000)                                   
+d.coged.SV <- inner_join(d.coged.SV, d.NBack.RT.ind)
+d.coged.SV$Task <- factor(d.coged.SV$Task, levels = c("red","blue","purple"), labels = c("2-Back","3-Back","4-Back"))
+
+#adding n-back task performance (meanRT) to the model predicting SV
+m.coged.nback.RT <- lmer(data = d.coged.SV, SV ~ taskCode*conditionCode*ageCode + mean_HitRate + meanRT_s + (1 | subjectid))
+tab_model(m.coged.nback.RT)
+```
+
+# EMA Data
+
+```{r importdata, warning=FALSE}
+#Import concatenated EMA data
+codebook.path <- "https://raw.githubusercontent.com/jlcrawford/OA_CogED_online/master/Data/Codebook.csv"
+codebook <- read.csv(codebook.path, header = T)
+#create list of new variable names from codebook
+new.names <- codebook$new_itemname
+
+#read in EMA data
+EMA<- read.csv(EMA.path, header = T) %>% inner_join(Subject.IDs, by = "subjectid")
+
+#clean up extraneous variables from Qualtrics survey
+EMA.clean <- EMA %>% select(-c(EndDate, RecordedDate, Status, IPAddress, Progress, Finished, ResponseId, RecipientLastName, RecipientFirstName, RecipientEmail, ExternalReference,LocationLatitude,LocationLongitude, DistributionChannel, UserLanguage, SC0)) %>%
+  setNames(new.names) %>%
+  separate(date, c("date", "time"), sep = " ") %>%
+  mutate(Date = as.Date.character(date, "%m/%d/%y"),
+         day = weekdays(Date),
+         timeDay = if_else(time < 12, "morning", if_else(time > 18, "evening", "afternoon")))
+```
+
+## Current Activities
+
+Participants completed a variety of activities as a part of their daily lives. Here, we have summarized the percentage of time participants spent in each of the twenty activities listed in the survey across the entirety of the seven-day protocol. 
+
+```{r currentactivities, warning = FALSE}
+#Individual pie chart for item "What are you doing right now"
+activities.string <- paste(EMA.clean$activities, collapse = "," )
+activity.vector <- str_split(activities.string, ',')[[1]]
+activity.clean <- data_frame(activity.vector)
+activity_freq <- activity.clean %>% group_by(activity.vector) %>% tally() %>% filter(activity.vector !="") %>%
+  rename(activity = activity.vector) %>%
+  mutate(percentage = (n / sum(n))*100)
+activity_freq$activity <- factor(activity_freq$activity, levels=c(1,2,14,12,16,4,7,20,21,6,19,10,8,5,15,9,3,13,17,18,11), labels=c("Eating or Drinking","TV", "Computer", "In Transit", "Reading", "Socializing", "Sleeping", "Chores","Listening to Speech", "Work", "Hygiene", "Cooking", "Errands", "Exercise", "Radio", "Cleaning", "Entertainment", "Nothing in Particular", "School", "Volunteering", "Doctor's Appointment"))
+
+kable(activity_freq, caption =  "Frequency of Current Activities")
+
+current.activities <- ggplot(activity_freq, aes(x = "" , y= percentage, fill=activity)) +
+geom_bar(width = 1, stat = "identity") + ggtitle("Daily Life Activities")
+
+blank_theme <- theme_minimal() + theme(axis.title.x = element_blank(),
+axis.title.y = element_blank(),panel.border = element_blank(),
+panel.grid=element_blank(),axis.ticks = element_blank(),
+plot.title=element_text(size=14, face="bold"))
+
+pie_current_activity <- current.activities + coord_polar("y", start=0) + blank_theme +
+theme(axis.text.x=element_blank()) 
+
+pie_current_activity + scale_fill_discrete(name = "Activity")
+```
+
+## Mental Demand of Current Activities
+
+Here, we have summarized the average mental demand and variability of mental demand ratings for each activity across both younger and older adults. These results are further visualized with a bar plot, which summarizes the average mental demand of each of the activities across both age groups (error bars = standard error). Overall, younger adults tend to report higher levels of mental demand across a variety of activities in daily life. Furthermore, there is face validity to these ratings in that activities, such as working and volunteering, are rated higher in mental demand relative to activities, such as watching tv or eating and drinking.
+
+```{r cogeffort, warning=FALSE, message=FALSE}
+#create data frame of mental demand ratings
+m.demand <- EMA.clean %>% select(subjectid,ageGroup,time,timeDay,day,starts_with("demand_")) %>%
+  pivot_longer(names_to = "category", values_to = "rating", -c(subjectid, ageGroup, time, timeDay, day)) %>%
+  separate(col = category, into=c(NA,"Category"), sep = "_") 
+
+#summarizing average mental demand of activities across all participants
+m.demand.subj <-m.demand %>% group_by(subjectid,ageGroup,Category) %>%
+  summarise(mean.demand = mean(rating, na.rm = T),
+            iSD.demand = sd(rating, na.rm=T))
+
+#table summary of mean and iSD of mental demand across age group and activity category
+m.demand.sum <- summarySEwithin2(m.demand.subj, measurevar = "mean.demand", withinvars = c("Category"), betweenvars = "ageGroup", idvar = "subjectid")
+
+table.demand <- m.demand.sum %>% select(Category, mean.demand) %>% kable(caption =  "Average Mental Demand for Current Activities")
+table.demand
+
+#plotting mental demand associated with each of the surveyed activities
+p.mental.demand <- ggplot(m.demand.sum, aes(x = Category, y= mean.demand, fill=ageGroup)) +
+ theme(plot.title = element_text(hjust = 0.5), panel.grid.major = element_blank(), panel.grid.minor = element_blank(), panel.background = element_blank(), axis.line = element_line(colour = "black"), axis.text.x = element_text(angle = 45, hjust = 1)) +
+  geom_bar(stat="identity", position=position_dodge()) +
+  geom_errorbar(position=position_dodge(width=0.9), aes(ymin=mean.demand-se, ymax=mean.demand+se), width=.2) +
+  coord_cartesian(ylim=c(1,4)) +
+  xlab("Activity") + ylab("Mental Demand") + ggtitle("Average Mental Demand of Activities")
+p.mental.demand + labs(fill = "Age Group") + scale_fill_brewer(palette = "Paired")
+
+m.demand.iSD.sum <- summarySEwithin2(m.demand.subj, measurevar = "iSD.demand", withinvars = c("Category"), betweenvars = "ageGroup", idvar = "subjectid")
+
+table.demand.isd <- m.demand.iSD.sum %>% select(Category, iSD.demand) %>% kable(caption =  "Variayion in Mental Demand Ratings for Current Activities")
+table.demand.isd
+
+#plotting mental demand associated with each of the surveyed activities
+p.mental.demand.iSD <- ggplot(m.demand.iSD.sum, aes(x = Category, y= iSD.demand, fill=ageGroup)) +
+ theme(plot.title = element_text(hjust = 0.5), panel.grid.major = element_blank(), panel.grid.minor = element_blank(), panel.background = element_blank(), axis.line = element_line(colour = "black"), axis.text.x = element_text(angle = 45, hjust = 1)) +
+  geom_bar(stat="identity", position=position_dodge()) +
+  geom_errorbar(position=position_dodge(width=0.9), aes(ymin=iSD.demand-se, ymax=iSD.demand+se), width=.2) +
+  xlab("Activity") + ylab("Varibility in Mental Demand") + ggtitle("Variability of Mental Demand Ratings")
+p.mental.demand.iSD + labs(fill = "Age Group") + scale_fill_brewer(palette = "Paired")
+```
+
+In addition, we have summarized the mental demand ratings by the frequency with which participants are reporting them in daily life; as is evident from the histogram, the vast majority of daily life activities across both younger and older adults are low in mental demand.
+
+```{r mentalDemand_freq, warning = FALSE, message = FALSE}
+#plotting mental demand as a frequency of reported daily life activities
+m.demand.sum$Category <- factor(m.demand.sum$Category, levels = c("work", "volunteer", "doctor", "transit", "social", "exercise", "computer", "cleaning", "entertain", "cooking", "reading", "errand", "chores", "radio", "hygeine", "tv", "nothing", "eat", "sleep"), labels = c("Work", "Volunteering", "Doctor's Appt.", "In Transit", "Socializing", "Exercising", "Computer", "Cleaning", "Entertainment", "Cooking", "Reading", "Errands", "Chores", "Radio", "Hygiene", "TV", "Nothing in Particular", "Eating/Drinking", "Sleeping"))
+
+#tabulating frequency of mental demand ratings (from 5-point likert scale)
+m.demand$rating <- factor(m.demand$rating, levels=c(1,2,3,4,5), labels = c("Not at All","A Little Bit","Moderately", "Quite a Bit", "Extremely"))  
+m.demand.freq <- m.demand %>% group_by(rating) %>% tally() %>% filter(rating != "NA")
+
+kable(m.demand.freq, caption =  "Frequency of 'Mental Demand' Responses for Current Activities")
+
+#plotting frequency of mental demand in daily life
+m.demand.frequency <- ggplot(m.demand.freq, aes(x = rating, y= n)) +
+ theme(plot.title = element_text(hjust = 0.5), panel.grid.major = element_blank(), panel.grid.minor = element_blank(), panel.background = element_blank(), axis.line = element_line(colour = "black")) + scale_x_discrete(limits=c("Not at All","A Little Bit","Moderately", "Quite a Bit", "Extremely")) +
+  geom_bar(stat="identity", position=position_dodge()) + ggtitle("Mental Demand of Activities") + xlab("Mental Demand") + ylab("Frequency")
+m.demand.frequency
+```

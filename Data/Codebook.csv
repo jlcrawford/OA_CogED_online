@@ -1,0 +1,104 @@
+﻿orig_itemname,new_itemname,description
+subjectid,subjectid,Subject ID
+agegroup,ageGroup,Age Group
+StartDate,date,Date
+Duration..in.seconds.,duration,Survey duration (seconds)
+Q1,affect_calm,How calm do you feel right now?
+Q2,affect_excited,How excited do you feel right now?
+Q3,affect_fearful,How fearful do you feel right now?
+Q4,affect_sluggish,How sluggish do you feel right now?
+Q5,affect_passive,How passive do you feel right now?
+Q6,affect_happy,How happy do you feel right now?
+Q7,affect_sad,How sad do you feel right now?
+Q8,affect_aroused,How aroused do you feel right now?
+Q13,social_partner,Who are you with right now?
+Q9,activities,"In the past two hours, which of these activities have you done? [select all that apply]"
+X1_Q10,demand_eat,Eating or drinking - How mentally demanding was this activity: [Field-1]?
+X1_Q11,decision_eat,Eating or drinking - Why did you do this activity: [${lm://Field/1}]?
+X1_Q17,motiv_eat,Eating or drinking - How motivated were you to do this activity: [${lm://Field/1}]?
+X1_Q35,enjoy_eat,Eating or drinking - Did you enjoy this activity: [${lm://Field/1}]?
+X2_Q10,demand_tv,TV - How mentally demanding was this activity: [Field-1]?
+X2_Q11,decision_tv,TV - Why did you do this activity: [${lm://Field/1}]?
+X2_Q17,motiv_tv,TV - How motivated were you to do this activity: [${lm://Field/1}]?
+X2_Q35,enjoy_tv,TV - Did you enjoy this activity: [${lm://Field/1}]?
+X3_Q10,demand_entertain,Entertainment away from home - How mentally demanding was this activity: [Field-1]?
+X3_Q11,decision_entertain,Entertainment away from home - How motivated were you to do this activity: [${lm://Field/1}]?
+X3_Q17,motiv_entertain,Entertainment away from home - Why did you do this activity: [${lm://Field/1}]?
+X3_Q35,enjoy_entertain,Entertainment away from home - Did you enjoy this activity: [${lm://Field/1}]?
+X4_Q10,demand_social,Socializing - How mentally demanding was this activity: [Field-1]?
+X4_Q11,decision_social,Socializing - How motivated were you to do this activity: [${lm://Field/1}]?
+X4_Q17,motiv_social,Socializing - Why did you do this activity: [${lm://Field/1}]?
+X4_Q35,enjoy_social,Socializing - Did you enjoy this activity: [${lm://Field/1}]?
+X5_Q10,demand_exercise,Exercising - How mentally demanding was this activity: [Field-1]?
+X5_Q11,decision_exercise,Exercising - Why did you do this activity: [${lm://Field/1}]?
+X5_Q17,motiv_exercise,Exercising - How motivated were you to do this activity: [${lm://Field/1}]?
+X5_Q35,enjoy_exercise,Exercising - Did you enjoy this activity: [${lm://Field/1}]?
+X6_Q10,demand_work,Work - How mentally demanding was this activity: [Field-1]?
+X6_Q11,decision_work,Work - Why did you do this activity: [${lm://Field/1}]?
+X6_Q17,motiv_work,Work - How motivated were you to do this activity: [${lm://Field/1}]?
+X6_Q35,enjoy_work,Work - Did you enjoy this activity: [${lm://Field/1}]?
+X7_Q10,demand_sleep,Sleeping - How mentally demanding was this activity: [Field-1]?
+X7_Q11,decision_sleep,Sleeping - Why did you do this activity: [${lm://Field/1}]?
+X7_Q17,motiv_sleep,Sleeping - How motivated were you to do this activity: [${lm://Field/1}]?
+X7_Q35,enjoy_sleep,Sleeping - Did you enjoy this activity: [${lm://Field/1}]?
+X8_Q10,demand_errand,Running an errand - How mentally demanding was this activity: [Field-1]?
+X8_Q11,decision_errand,Running an errand - Why did you do this activity: [${lm://Field/1}]?
+X8_Q17,motiv_errand,Running an errand - How motivated were you to do this activity: [${lm://Field/1}]?
+X8_Q35,enjoy_errand,Running an errand - Did you enjoy this activity: [${lm://Field/1}]?
+X9_Q10,demand_cleaning,Cleaning - How mentally demanding was this activity: [Field-1]?
+X9_Q11,decision_cleaning,Cleaning - How motivtaed were you to do this activity: [${lm://Field/1}]?
+X9_Q17,motiv_cleaning,Cleaning - Why did you do this activity: [${lm://Field/1}]?
+X9_Q35,enjoy_cleaning,Cleaning - Did you enjoy this activity: [${lm://Field/1}]?
+X10_Q10,demand_cooking,Cooking - How mentally demanding was this activity: [Field-1]?
+X10_Q11,decision_cooking,Cooking - Why did you do this activity: [${lm://Field/1}]?
+X10_Q17,motiv_cooking,Cooking - How motivated were you to do this activity: [${lm://Field/1}]?
+X10_Q35,enjoy_cooking,Cooking - Did you enjoy this activity: [${lm://Field/1}]?
+X11_Q10,demand_doctor,Doctor's appointment - How mentally demanding was this activity: [Field-1]?
+X11_Q11,decision_doctor,Doctor's appointment - Why did you do this activity: [${lm://Field/1}]?
+X11_Q17,motiv_doctor,Doctor's appointment - How motivated were you do this activity: [${lm://Field/1}]?
+X11_Q35,enjoy_doctor,Doctor's appointment - Did you enjoy this activity: [${lm://Field/1}]?
+X12_Q10,demand_transit,In transit - How mentally demanding was this activity: [Field-1]?
+X12_Q11,decision_transit,In transit - Why did you do this activity: [${lm://Field/1}]?
+X12_Q17,motiv_transit,In transit - How motivated were you to do this activity: [${lm://Field/1}]?
+X12_Q35,enjoy_transit,In transit - Did you enjoy this activity: [${lm://Field/1}]?
+X13_Q10,demand_nothing,Nothing in particular - How mentally demanding was this activity: [Field-1]?
+X13_Q11,decision_nothing,Nothing in particular - Why did you do this activity: [${lm://Field/1}]?
+X13_Q17,motiv_nothing,Nothing in particular - How motivated were you to do this activity: [${lm://Field/1}]?
+X13_Q35,enjoy_nothing,Nothing in particular - Did you enjoy this activity: [${lm://Field/1}]?
+X14_Q10,demand_computer,Computer - How mentally demanding was this activity: [Field-1]?
+X14_Q11,decision_computer,Computer - Why did you do this activity: [${lm://Field/1}]?
+X14_Q17,motiv_computer,Computer - How motivated were you to do this activity: [${lm://Field/1}]?
+X14_Q35,enjoy_computer,Computer - Did you enjoy this activity: [${lm://Field/1}]?
+X15_Q10,demand_radio,Radio - How mentally demanding was this activity: [Field-1]?
+X15_Q11,decision_radio,Radio - Why did you do this activity: [${lm://Field/1}]?
+X15_Q17,motiv_radio,Radio - How motivated were you to do this activity: [${lm://Field/1}]?
+X15_Q35,enjoy_radio,Radio - Did you enjoy this activity: [${lm://Field/1}]?
+X16_Q10,demand_reading,Reading - How mentally demanding was this activity: [Field-1]?
+X16_Q11,decision_reading,Reading - Why did you do this activity: [${lm://Field/1}]?
+X16_Q17,motiv_reading,Reading - How motivated were you to do this activity: [${lm://Field/1}]?
+X16_Q35,enjoy_reading,Reading - Did you enjoy this activity: [${lm://Field/1}]?
+X17_Q10,demand_school,School - How mentally demanding was this activity: [Field-1]?
+X17_Q11,decision_school,School - Why did you do this activity: [${lm://Field/1}]?
+X17_Q17,motiv_school,School - How motivated were you to do this activity: [${lm://Field/1}]?
+X17_Q35,enjoy_school,School - Did you enjoy this activity: [${lm://Field/1}]?
+X18_Q10,demand_volunteer,Volunteering - How mentally demanding was this activity: [Field-1]?
+X18_Q11,decision_volunteer,Volunteering - Why did you do this activity: [${lm://Field/1}]?
+X18_Q17,motiv_volunteer,Volunteering - How motivated were you to do this activity: [${lm://Field/1}]?
+X18_Q35,enjoy_volunteer,Volunteering - Did you enjoy this activity: [${lm://Field/1}]?
+X19_Q10,demand_hygeine,Hygiene - How mentally demanding was this activity: [Field-1]?
+X19_Q11,decision_hygeine,Hygiene - Why did you do this activity: [${lm://Field/1}]?
+X19_Q17,motiv_hygiene,Hygiene - How motivated were you to do this activity: [${lm://Field/1}]?
+X19_Q35,enjoy_hygeine,Hygiene - Did you enjoy this activity: [${lm://Field/1}]?
+X20_Q10,demand_chores,Chores - How mentally demanding was this activity: [Field-1]?
+X20_Q11,decision_chores,Chores - Why did you do this activity: [${lm://Field/1}]?
+X20_Q17,motiv_chores,Chores - How motivated were you to do this activity: [${lm://Field/1}]?
+X20_Q35,enjoy_chores,Chores - Did you enjoy this activity: [${lm://Field/1}]?
+X21_Q10,demand_speech,Speech - How well does this activity [[Field-1]] fit with your prescribed goal(s)?
+X21_Q11,decision_speech,Speech - Why did you do this activity: [${lm://Field/1}]?
+X21_Q17,motiv_speech,Speech - How motovated were you to do this activity: [${lm://Field/1}]?
+X21_Q35,enjoy_speech,Speech - Did you enjoy this activity: [${lm://Field/1}]?
+Q64,speech_effort,How effortful was it to listen effectively during your listening experience?
+Q65,speech_location,Where were you when you were listening to speech?
+Q66,speech_category,Which category best describes the nature of your listening experience?
+Q34,speech_noise,"On average, how noisy was it during the listening event?"
+age,age,Participant age

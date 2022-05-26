@@ -11,7 +11,7 @@ output:
 rm(list=ls())
 
 # Packages
-library(lme4); library(lmerTest); library(sjstats); library(sjPlot); library(ggeffects); library(ggpubr); library(knitr); library(RColorBrewer); library(tidyverse);
+library(lme4); library(lmerTest); library(sjstats); library(sjPlot); library(ggeffects); library(performance); library(ggpubr); library(knitr); library(RColorBrewer); library(tidyverse);
 source("summarySEwithin2.R")
 
 #Create data directories
@@ -49,6 +49,17 @@ d.coged <- coged %>% distinct(subjectid, .keep_all = TRUE) %>% inner_join(Subjec
          SV_purple__loss = ((IP14_1_loss/2 + IP14_2_loss/3 + IP14_3_loss/4)/3)*-1, 
          mean_HitRate = (hitrate_N1 + hitrate_N2 + hitrate_N3 + hitrate_N4)/4)
 
+Cog_ED_ind_SV <- d.coged %>%
+  mutate(meanSV_gain = (SV_red__gain + SV_blue__gain + SV_purple__gain)/3,
+         meanSV_loss = (SV_red__loss + SV_blue__loss + SV_purple__loss)/3, 
+         mean_HitRate = (hitrate_N1 + hitrate_N2 + hitrate_N3 + hitrate_N4)/4,
+         LossGain_diff = meanSV_loss-meanSV_gain,
+         GainLoss_diff = meanSV_gain-meanSV_loss, 
+         GainLoss_index = (meanSV_gain-meanSV_loss)/(meanSV_gain + meanSV_loss),
+         GainLoss_avg = (meanSV_loss + meanSV_gain)/2)
+Cog_ED_ind_SV$meanSV_gain_c <- scale(Cog_ED_ind_SV$meanSV_gain, center = T, scale = F)
+Cog_ED_ind_SV$meanSV_loss_c <- scale(Cog_ED_ind_SV$meanSV_loss, center = T, scale = F)
+
 #summarizing N-Back performance
 d.NBack <- d.coged %>% select(subjectid, ageGroup, hitrate_N1, hitrate_N2, hitrate_N3, hitrate_N4) %>%
   pivot_longer(names_to = "tmp", values_to = "Performance", -c(subjectid, ageGroup)) %>%
@@ -70,7 +81,7 @@ p.nback + labs(fill = "Age Group") + scale_fill_brewer(palette = "Paired")
 
 #model of N-Back hit rate predicted by task level and age group
 m.nback.HR <- lmer(data = d.NBack, Performance ~ taskCode + ageCode + (1| subjectid))
-tab_model(m.nback.HR)
+tab_model(m.nback.HR, pred.labels = c("Intercept", "Task Level", "Age Group"), dv.labels = c("N-Back Peformance (Hit Rate)"), show.stat = T, show.icc = F, show.re.var = F, show.obs = F, show.r2 = F)
 
 #summarizing N-Back performance
 d.NBack.RT <- coged.full %>% rename(subjectid = "subject") %>% select(subjectid, ageGroup, blockcode, phase, correct, latency) %>%
@@ -92,7 +103,7 @@ p.nback.RT + labs(fill = "Age Group") + scale_fill_brewer(palette = "Paired")
 
 #model of N-Back RT predicted by task level and age group
 m.nback.RT <- lmer(data = d.NBack.RT, RT ~ taskCode + ageCode + (1| subjectid))
-tab_model(m.nback.RT)
+tab_model(m.nback.RT, pred.labels = c("Intercept", "Task Level", "Age Group"), dv.labels = c("N-Back Peformance (RT)"), show.stat = T, show.icc = F, show.re.var = F, show.obs = F, show.r2 = F)
 ```
 
 ## Adding N-Back performance to the models predicting Subjective Value (SV)
@@ -121,7 +132,7 @@ d.coged.SV$Task <- factor(d.coged.SV$Task, levels = c("red","blue","purple"), la
 
 #adding n-back task performance (meanRT) to the model predicting SV
 m.coged.nback.RT <- lmer(data = d.coged.SV, SV ~ taskCode*conditionCode*ageCode + mean_HitRate + meanRT_s + (1 | subjectid))
-tab_model(m.coged.nback.RT)
+tab_model(m.coged.nback.RT, pred.labels = c("Intercept", "Task Level", "Condition", "Age Group", "Mean Hit Rate", "Mean RT (sec)", "Task Level * Condition", "Task Level * Age Group", "Condition * Age Group", "Task Level * Condition * Age Group"), dv.labels = c("Subjective Value"), show.stat = T, show.icc = F, show.re.var = F, show.obs = F, show.r2 = F)
 ```
 
 # EMA Data
@@ -227,13 +238,109 @@ m.demand.sum$Category <- factor(m.demand.sum$Category, levels = c("work", "volun
 
 #tabulating frequency of mental demand ratings (from 5-point likert scale)
 m.demand$rating <- factor(m.demand$rating, levels=c(1,2,3,4,5), labels = c("Not at All","A Little Bit","Moderately", "Quite a Bit", "Extremely"))  
-m.demand.freq <- m.demand %>% group_by(rating) %>% tally() %>% filter(rating != "NA")
-
-kable(m.demand.freq, caption =  "Frequency of 'Mental Demand' Responses for Current Activities")
+m.demand.freq <- m.demand %>% group_by(rating, ageGroup) %>% filter(rating != "NA") %>%
+  summarise (n=n(), .groups = "drop") %>%
+  mutate(rel.freq =  (n/sum(n)))
 
 #plotting frequency of mental demand in daily life
-m.demand.frequency <- ggplot(m.demand.freq, aes(x = rating, y= n)) +
+m.demand.frequency <- ggplot(m.demand.freq, aes(x = rating, y= rel.freq)) +
  theme(plot.title = element_text(hjust = 0.5), panel.grid.major = element_blank(), panel.grid.minor = element_blank(), panel.background = element_blank(), axis.line = element_line(colour = "black")) + scale_x_discrete(limits=c("Not at All","A Little Bit","Moderately", "Quite a Bit", "Extremely")) +
-  geom_bar(stat="identity", position=position_dodge()) + ggtitle("Mental Demand of Activities") + xlab("Mental Demand") + ylab("Frequency")
+  geom_bar(stat="identity", position=position_dodge()) + ggtitle("Mental Demand of Activities") + xlab("Mental Demand") + ylab("Relative Frequency") +
+  facet_wrap(.~ageGroup)
 m.demand.frequency
+```
+
+## Control Analysis: Checking for multicollinearity in the Daily Life Mental Demand Multilevel Model
+
+Because the zero-order correlations between the gain and loss subjective value estimates are highly correlated within participants in both younger, r = 0.58 [0.47, 0.68], t = 9.14, p < 0.001, and older adults, r = 0.54 [0.41, 0.64], t = 7.66, p < 0.001, we checked for multicollinearity in our model predicting daily life mental demand in which both gain and loss subjective values estimates (and their interactions with age group) were included as predictors. In the multilevel model predicting daily life mental demand, we used the centered subjective value estimates as predictors and as can be seen from the results below, the variance inflation factor for all predictors in the model are relatively low, suggesting that multicollinearity is not a concern for this model of interest.
+
+```{r mentalDemand, warning=FALSE, message=FALSE}
+#create data frame of mental demand ratings
+m.demand <- EMA.clean %>% select(subjectid,ageGroup,time,timeDay,day,starts_with("demand_")) %>%
+  pivot_longer(names_to = "category", values_to = "rating", -c(subjectid, ageGroup, time, timeDay, day)) %>%
+  separate(col = category, into=c(NA,"Category"), sep = "_") 
+
+#summarizing average mental demand of activities across all participants
+m.demand.subj.av <-m.demand %>% group_by(subjectid, ageGroup) %>%
+  summarise(count.demand = sum(!is.na(rating)),
+         mean.demand = mean(rating, na.rm=T),
+         iSD.demand = sd(rating, na.rm=T)) %>%
+  filter(count.demand > 3)
+
+m.demand.subj.IDs <- m.demand.subj.av %>% select(subjectid, ageGroup)
+
+#summarizing mental demand across the days of the week and time of day
+m.demand.time.day <- m.demand %>% group_by(subjectid,ageGroup,time,day,timeDay) %>% 
+  summarise(count.demand = sum(!is.na(rating)),
+         mean.demand = mean(rating, na.rm=T)) %>%
+  mutate(dayCode = factor(day, levels = c("Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"),
+                          labels = c(0,1,2,3,4,5,6)),
+         timeCode = factor(timeDay, levels = c("morning","afternoon","evening"),
+                          labels = c(-1,0,1)),
+         ageCode = factor(ageGroup, levels = c("Young","Old"), labels = c(0,1))) %>% inner_join(m.demand.subj.IDs) %>%
+  inner_join(Cog_ED_ind_SV)
+m.demand.time.day$dayCode <- as.numeric(as.character(m.demand.time.day$dayCode))
+m.demand.time.day$timeCode <- as.numeric(as.character(m.demand.time.day$timeCode))
+m.demand.time.day$ageCode <- as.numeric(as.character(m.demand.time.day$ageCode))
+
+# age + day of the week + time of the day + average Gain SV + average Loss SV (with age interactions) predicting mental demand
+m.mental.demand.age.timeDay.Gainloss.int<- lmer(data = m.demand.time.day, mean.demand~ ageCode + dayCode + timeCode + meanSV_gain_c*ageCode + meanSV_loss_c*ageCode + (1 | subjectid))
+
+#check model for multicollinearity
+check_collinearity(m.mental.demand.age.timeDay.Gainloss.int)
+```
+
+## Control Analysis: Adding Activity Count at Each Measurement Occasion into the Multilevel Model Predicting Mental Demand
+
+Given the variable number of activities that participants can endorse (and subsequently rate the mental demand of) at each measurement occasion, we sought to test whether activity count of mental demand ratings (at each measurement occasion) was a significant predictor in the multilevel model predicting daily life mental demand. Indeed, we found that activity count was a significant predictor of daily life mental demand, B = -0.15 [-0.18, -0.12], t = -9.95, p < 0.001. In other words, an increase in the number of activities endorsed and rated at each measurement occasions tended be associated with a reduction in the mental demand of daily life activities. Results from a model comparison show that adding the activity count to the multilevel model does help to explain addition variance. Nonetheless, and most critically, even after controlling for activity count in the model, we still observe significant effects cognitive effort costs across both gain and loss incentive domains and their interaction with age group (see output below).
+
+```{r ActivityCount, warning = FALSE, message=FALSE}
+# age + day of the week + time of the day + average Gain SV + average Loss SV (with age interactions) + activity count predicting mental demand
+m.mental.demand.age.timeDay.Gainloss.int.count<- lmer(data = m.demand.time.day, mean.demand ~ ageCode + dayCode + timeCode + meanSV_gain_c*ageCode + meanSV_loss_c*ageCode + count.demand + (1 | subjectid))
+
+#table summarizing model output after adding in activity count
+table.S1 <- tab_model(m.mental.demand.age.timeDay.Gainloss.int.count, pred.labels = c("Intercept", "Age Group", "Day of Week", "Time of Day", "SV (Gain)", "SV (Loss)","Activity Count", "Age Group * SV (Gain)", "Age Group * SV (Loss)"), dv.labels = c("Mental Demand Rating"), show.stat = T, show.icc = F, show.re.var = F, show.obs = F, show.r2 = F)
+table.S1
+
+#does adding activity count help to explain additional variance in the model predicting daily life mental demand?
+anova(m.mental.demand.age.timeDay.Gainloss.int, m.mental.demand.age.timeDay.Gainloss.int.count)
+```
+
+We sought to further characterize the relationship between activity count by testing whether the mean activity count at each measurement occasion differs by age group. Indeed, we found that on average older adults tend to endorse, and subsequently rate, more activities (M=2.03) relative to younger adults (M=1.90), t(226.5) = 2.01, p = 0.045.
+
+```{r ActivityAge, warning=FALSE, message=FALSE}
+#does count of activities differ by age group?
+count.data <- m.demand.time.day %>% select(subjectid, ageGroup, count.demand, mean_HitRate, meanSV_gain, meanSV_loss) %>% group_by(subjectid, ageGroup, mean_HitRate, meanSV_gain, meanSV_loss) %>%
+  summarise(mean.count = mean(count.demand))
+
+T.count <- t.test(data = count.data, mean.count ~ ageGroup)
+T.count
+```
+
+In contrast to the preliminary findings suggesting an age group effect on activity count, we did not observe any relationship between the average number of activities participants provided mental demand ratings for either Cog-ED choice behavior or N-Back performance.
+
+```{r ActivityOther, warning=FALSE, message=FALSE}
+count.model.HR <- lm(data = count.data, mean.count ~ mean_HitRate)
+summary(count.model.HR)
+
+count.model.SV <- lm(data = count.data, mean.count ~ meanSV_gain + meanSV_loss)
+summary(count.model.SV)
+
+count.model.full <- lm(data = count.data, mean.count ~ meanSV_gain + meanSV_loss + mean_HitRate)
+summary(count.model.full)
+```
+
+## Exploratory Analysis: Reward Motivation and Daily Life Mental Demand
+
+Exploratory analyses revealed a selective impact of reward motivation on daily life mental demand. To test for this effect, we created a Gain-Loss index variable by subtracting the average subjective value in the loss domain from the average subjective value in the gain domain, divided by the sum of the two (i.e., Gain SV - Loss SV/ (Gain SV + Loss SV)). We then entered this Gain-Loss index into the model predicting daily life mental demand engagement. A positive relationship was observed, B = 0.54 [0.26, 0.81], t = 3.78, p < 0.001, suggesting that participants who are most willing to engage in cognitive effort to receive positive reward outcomes tend to have higher levels of mental demand than those who engage in cognitive effrot more to avoid losses.
+
+```{r RewardMotivation, warning=FALSE, message=FALSE}
+# age + day of the week + time of the day + reward motivation index predicting mental demand
+m.mental.demand.age.timeDay.index <- lmer(data = m.demand.time.day, mean.demand ~ ageCode + dayCode + timeCode + GainLoss_index + (1 | subjectid))
+
+# age + day of the week + time of the day + reward motivation index (+ age interaction) predicting mental demand
+m.mental.demand.age.timeDay.index.int <- lmer(data = m.demand.time.day, mean.demand ~ ageCode + dayCode + timeCode + GainLoss_index*ageCode + (1 | subjectid))
+
+table.S2 <- tab_model(m.mental.demand.age.timeDay.index.int, pred.labels = c("Intercept", "Age Group", "Day of Week", "Time of Day", "Gain-Loss Index", "Age Group * Gain-Loss Index"), dv.labels = c("Mental Demand Rating"), show.stat = T, show.icc = F, show.re.var = F, show.obs = F, show.r2 = F)
+table.S2
 ```

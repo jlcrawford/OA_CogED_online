@@ -12,7 +12,7 @@ output:
 rm(list=ls())
 
 # Packages
-library(correlation); library(lme4); library(lmerTest); library(sjstats); library(sjPlot); library(ggeffects); library(ggpubr); library(knitr); library(RColorBrewer); library(tidyverse);
+library(correlation); library(lme4); library(lmerTest); library(sjstats); library(sjPlot); library(ggeffects); library(ggpubr); library(knitr); library(RColorBrewer); library(psych); library(tidyverse);
 source("summarySEwithin2.R")
 
 #Create data directories
@@ -95,7 +95,6 @@ fig.1
 ```{r MLM_CogED_SV, warning=FALSE, message=FALSE}
 #multilevel model of SV (DV) with task level, condition (gain, loss), and age (young, old)
 m.coged <- lmer(data = d.coged.SV, SV ~ taskCode*conditionCode*ageCode + (1 | subjectid))
-summary(m.coged)
 
 #breaking down the task x condition interaction
 test.2back <- t.test(data = d.coged.SV %>% filter(taskCode == -1), SV ~ conditionCode, paired = T)
@@ -111,7 +110,11 @@ Cog_ED_ind_SV <- d.coged %>%
          meanSV_loss = (SV_red__loss + SV_blue__loss + SV_purple__loss)/3, 
          mean_HitRate = (hitrate_N1 + hitrate_N2 + hitrate_N3 + hitrate_N4)/4,
          LossGain_diff = meanSV_loss-meanSV_gain,
-         GainLoss_diff = meanSV_gain-meanSV_loss)
+         GainLoss_diff = meanSV_gain-meanSV_loss, 
+         GainLoss_index = (meanSV_gain-meanSV_loss)/(meanSV_gain + meanSV_loss),
+         GainLoss_avg = (meanSV_loss + meanSV_gain)/2)
+Cog_ED_ind_SV$meanSV_gain_c <- scale(Cog_ED_ind_SV$meanSV_gain, center = T, scale = F)
+Cog_ED_ind_SV$meanSV_loss_c <- scale(Cog_ED_ind_SV$meanSV_loss, center = T, scale = F)
 
 #Calculating correlation across gain & loss incentive contexts
 corr.YA.GainLoss <- cor_test(data = Cog_ED_ind_SV %>% filter(ageGroup == "Young"), "meanSV_gain", "meanSV_loss")
@@ -127,28 +130,18 @@ corr.OA.GainLoss
 ```{r orderEffects, warning = F, message = F}
 #testing for order effects in SV estimates
 m.coged.order <- lmer(data = d.coged.SV, SV ~ taskCode*conditionCode*ageCode + orderCode + (1 | subjectid))
-summary(m.coged.order)
 ```
 
 ## Table 1: The effects of task level, condition, age group, and task order on subjective value
 
 ```{r Table1, warning=FALSE, message=FALSE}
-table.1 <- tab_model(m.coged, m.coged.order, show.stat = TRUE, file = "table1.doc")
+table.1 <- tab_model(m.coged, m.coged.order, pred.labels = c("Intercept", "Task Level", "Condition", "Age Group", "Task Level * Condition", "Task Level * Age Group", "Condition * Age Group", "Task Level * Condition * Age Group", "Task Order"), dv.labels = c("Subjective Value", "Subjective Value"), show.stat = T, show.icc = F, show.re.var = F, show.obs = F, show.r2 = F)
 table.1
-```
-
-### Exploratory Analysis: Extracting residuals from linear model of loss SV estimates predicting gain SV estimates
-
-```{r, RewardMotiv, warning=FALSE, message=FALSE}
-m.coged.resid <- lm(data = Cog_ED_ind_SV, meanSV_gain ~ meanSV_loss)
-summary(m.coged.resid)
-coged.resids <- (summary(m.coged.resid))$residuals
-Cog_ED_ind_SV$coged.resids <- coged.resids
 ```
 
 # EMA Data
 
-```{r importdata, echo = TRUE}
+```{r importdata, warning=FALSE, message=FALSE}
 #Import concatenated EMA data
 codebook.path <- "https://raw.githubusercontent.com/jlcrawford/OA_CogED_online/master/Data/Codebook.csv"
 codebook <- read.csv(codebook.path, header = T)
@@ -167,17 +160,9 @@ EMA.clean <- EMA %>% select(-c(EndDate, RecordedDate, Status, IPAddress, Progres
          timeDay = if_else(time < 12, "morning", if_else(time > 18, "evening", "afternoon")))
 ```
 
-## Summarizing the average number of activities endorsed per ping
-
-```{r Activities, warning=FALSE, message=FALSE}
-EMA.activities <- EMA.clean %>% select(subjectid, day, timeDay, activities) %>% filter(activities > 0) %>%
-  mutate(activities.count = count.fields(textConnection(activities), sep = ","))
-EMA.activities.sum <- EMA.activities %>% summarise(mean.activities = mean(activities.count), sd.activities = sd(activities.count), range.activities = range(activities.count))
-```
-
 ## Mental Demand of Current Activities
 
-```{r cogeffort, echo = TRUE}
+```{r cogeffort, warning=FALSE, message=FALSE}
 #create data frame of mental demand ratings
 m.demand <- EMA.clean %>% select(subjectid,ageGroup,time,timeDay,day,starts_with("demand_")) %>%
   pivot_longer(names_to = "category", values_to = "rating", -c(subjectid, ageGroup, time, timeDay, day)) %>%
@@ -190,45 +175,43 @@ m.demand.subj.av <-m.demand %>% group_by(subjectid, ageGroup) %>%
          iSD.demand = sd(rating, na.rm=T)) %>%
   filter(count.demand > 3)
 
-m.demand.subj.IDs <- m.demand.subj.av %>% select(subjectid)
+index.sum.demand <- m.demand.subj.av %>% inner_join(Cog_ED_ind_SV) %>%
+  mutate(posIndex = if_else(GainLoss_index > 0, 1, 0))
+
+m.demand.subj.IDs <- m.demand.subj.av %>% select(subjectid, ageGroup)
 
 #testing for effects of SV and level-1 predictors (e.g., time of day, day of week) on mental demand ratings
-m.demand.clean <- m.demand %>%
-  mutate(ageCode = factor(m.demand$ageGroup, levels = c("Young", "Old"), labels = c(0,1)),
-         dayCode = factor(day, levels = c("Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"),
+m.demand.time.day <- m.demand %>% group_by(subjectid,ageGroup,time,day,timeDay) %>% 
+  summarise(count.demand = sum(!is.na(rating)),
+         mean.demand = mean(rating, na.rm=T)) %>%
+  mutate(dayCode = factor(day, levels = c("Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"),
                           labels = c(0,1,2,3,4,5,6)),
-         timeCode = factor(timeDay, levels = c("morning","afternoon","evening"), 
-                           labels = c(-1,0,1))) %>%
-  filter(!is.na(rating)) %>% inner_join(Cog_ED_ind_SV) %>% inner_join(m.demand.subj.IDs) %>%
-  mutate(meanSV_gain_c = scale(meanSV_gain, center = T, scale = F),
-         meanSV_loss_c = scale(meanSV_loss, center = T, scale = F))
-m.demand.clean$rating <- as.numeric(as.character(m.demand.clean$rating))
-m.demand.clean$ageCode <- as.numeric(as.character(m.demand.clean$ageCode))
-m.demand.clean$dayCode <- as.numeric(as.character(m.demand.clean$dayCode))
-m.demand.clean$timeCode <- as.numeric(as.character(m.demand.clean$timeCode))
+         timeCode = factor(timeDay, levels = c("morning","afternoon","evening"),
+                          labels = c(-1,0,1)),
+         ageCode = factor(ageGroup, levels = c("Young","Old"), labels = c(0,1))) %>% inner_join(m.demand.subj.IDs) %>%
+  inner_join(Cog_ED_ind_SV)
+m.demand.time.day$dayCode <- as.numeric(as.character(m.demand.time.day$dayCode))
+m.demand.time.day$timeCode <- as.numeric(as.character(m.demand.time.day$timeCode))
+m.demand.time.day$ageCode <- as.numeric(as.character(m.demand.time.day$ageCode))
 
 #null model of mental demand
-m.mental.demand <- lmer(data = m.demand.clean, rating ~ 1 + (1 | subjectid))
-summary(m.mental.demand)
+m.mental.demand <- lmer(data = m.demand.time.day, mean.demand ~ 1 + (1 | subjectid))
 icc(m.mental.demand)
 
 # age + day of the week + time of the day + average Gain SV + average Loss SV (with age interactions) predicting mental demand
-m.mental.demand.age.timeDay.Gainloss.int<- lmer(data = m.demand.clean, rating ~ ageCode + dayCode + timeCode + meanSV_gain_c*ageCode + meanSV_loss_c*ageCode + (1 | subjectid))
-summary(m.mental.demand.age.timeDay.Gainloss.int)
+m.mental.demand.age.timeDay.Gainloss.int<- lmer(data = m.demand.time.day, mean.demand ~ ageCode + dayCode + timeCode + meanSV_gain_c*ageCode + meanSV_loss_c*ageCode + (1 | subjectid))
 
 # age + day of the week + time of the day + average Gain SV + average Loss SV (with age interactions) predicting mental demand (YAs ONLY)
-m.mental.demand.age.timeDay.Gainloss.int.YA<- lmer(data = m.demand.clean %>% filter(ageCode ==0), rating ~ dayCode + timeCode + meanSV_gain_c + meanSV_loss_c + (1 | subjectid))
-summary(m.mental.demand.age.timeDay.Gainloss.int.YA)
+m.mental.demand.age.timeDay.Gainloss.int.YA<- lmer(data = m.demand.time.day %>% filter(ageCode ==0), mean.demand ~ dayCode + timeCode + meanSV_gain_c + meanSV_loss_c + (1 | subjectid))
 
 # age + day of the week + time of the day + average Gain SV + average Loss SV (with age interactions) predicting mental demand (OAs ONLY)
-m.mental.demand.age.timeDay.Gainloss.int.OA<- lmer(data = m.demand.clean %>% filter(ageCode ==1), rating ~ dayCode + timeCode + meanSV_gain_c + meanSV_loss_c + (1 | subjectid))
-summary(m.mental.demand.age.timeDay.Gainloss.int.OA)
+m.mental.demand.age.timeDay.Gainloss.int.OA<- lmer(data = m.demand.time.day %>% filter(ageCode ==1), mean.demand ~ dayCode + timeCode + meanSV_gain_c + meanSV_loss_c + (1 | subjectid))
 ```
 
 ## Table 2: Effects of age, day of week, time of day, and subjective value on daily life mental demand
 
 ```{r table2, warning=FALSE, message=FALSE}
-table.2 <- tab_model(m.mental.demand.age.timeDay.Gainloss.int, m.mental.demand.age.timeDay.Gainloss.int.YA, m.mental.demand.age.timeDay.Gainloss.int.OA, show.stat = TRUE, file = "table2.doc")
+table.2 <- tab_model(m.mental.demand.age.timeDay.Gainloss.int, m.mental.demand.age.timeDay.Gainloss.int.YA, m.mental.demand.age.timeDay.Gainloss.int.OA, pred.labels = c("Intercept", "Age Group", "Day of Week", "Time of Day", "SV (Gain)", "SV (Loss)", "Age Group * SV (Gain)", "Age Group * SV (Loss)"), dv.labels = c("Mental Demand Rating", "Mental Demand Rating (YAs)", "Mental Demand Rating (OAs)"), show.stat = T, show.icc = F, show.re.var = F, show.obs = F, show.r2 = F)
 table.2
 ```
 
@@ -240,6 +223,7 @@ CogED.gain.EMA <- ggpredict(m.mental.demand.age.timeDay.Gainloss.int, terms = c(
 p.gain.EMA <- ggplot(CogED.gain.EMA, aes(x, predicted, colour=group)) +
   geom_ribbon(aes(ymin = conf.low, ymax = conf.high), linetype = 0, alpha=.1) +
   geom_line(size =1) + theme_classic() +
+  coord_cartesian(ylim=c(1.4,2.8)) +
   scale_colour_brewer(palette = "Paired", "Age Group", labels = c("Younger","Older")) + labs(x="Subjective Value (Gain)",
                                                                                                               y="Predicted Mental Demand") 
 #extracting predicted values from multilevel model (loss)
@@ -247,35 +231,21 @@ CogED.loss.EMA <- ggpredict(m.mental.demand.age.timeDay.Gainloss.int, terms = c(
 p.loss.EMA <- ggplot(CogED.loss.EMA, aes(x, predicted, colour=group)) +
   geom_ribbon(aes(ymin = conf.low, ymax = conf.high), linetype = 0, alpha=.1) +
   geom_line(size =1) + theme_classic() +
+  coord_cartesian(ylim=c(1.4,2.8)) +
   scale_colour_brewer(palette = "Paired", "Age Group", labels = c("Younger","Older")) + labs(x="Subjective Value (Loss)",
-                                                                                                              y="Predicted Mental Demand") 
+                                                                                                              y="") 
 fig.2 <- ggarrange(p.gain.EMA, p.loss.EMA, labels = c("A", "B"), common.legend = TRUE)
 fig.2
 ```
 
-## Exploratory Analyses: reward motivation effects on daily life mental demand
+## Exploratory Analyses: Mediation analysis
 
-```{r rewardMotive_EMA, warning=FALSE, message=FALSE}
-# age + day of the week + time of the day + reward motivation residuals predicting mental demand
-m.mental.demand.age.timeDay.resid <- lmer(data = m.demand.clean, rating ~ ageCode + dayCode + timeCode + coged.resids + (1 | subjectid))
-summary(m.mental.demand.age.timeDay.resid)
+```{r mediation, warning=FALSE, message=FALSE}
+coged.mediation <- Cog_ED_ind_SV %>% inner_join(m.demand.subj.av) %>%
+   mutate(ageCode = factor(ageGroup, levels = c("Young", "Old"), labels = c(0,1)))
+coged.mediation$ageCode <- as.numeric(as.character(coged.mediation$ageCode))
 
-# age + day of the week + time of the day + reward motivation residuals (+ age interaction) predicting mental demand
-m.mental.demand.age.timeDay.resid.int <- lmer(data = m.demand.clean, rating ~ ageCode + dayCode + timeCode +  coged.resids*ageCode + (1 | subjectid))
-summary(m.mental.demand.age.timeDay.resid.int)
-
-# age + day of the week + time of the day + reward motivation residuals predicting mental demand (YAs ONLY)
-m.mental.demand.age.timeDay.resid.YA <- lmer(data = m.demand.clean %>% filter(ageCode == 0), rating ~ dayCode + timeCode + coged.resids + (1 | subjectid))
-summary(m.mental.demand.age.timeDay.resid.YA)
-
-# age + day of the week + time of the day + reward motivation residuals predicting mental demand (OAs ONLY)
-m.mental.demand.age.timeDay.resid.OA <- lmer(data = m.demand.clean %>% filter(ageCode == 1), rating ~ dayCode + timeCode + coged.resids + (1 | subjectid))
-summary(m.mental.demand.age.timeDay.resid.OA)
-```
-
-## Table 3: Effects of age, day of week, time of day, and reward motivation on daily life mental demand
-
-```{r table3, warning=FALSE, message=FALSE}
-table.3 <- tab_model(m.mental.demand.age.timeDay.resid.int, m.mental.demand.age.timeDay.resid.YA, m.mental.demand.age.timeDay.resid.OA, show.stat = TRUE, file = "table3.doc")
-table.3
+results.mediation.parallel = mediate(mean.demand ~ ageCode + (meanSV_gain) + (meanSV_loss), data = coged.mediation, n.iter = 5000)
+results.mediation.parallel
+summary(results.mediation.parallel)
 ```

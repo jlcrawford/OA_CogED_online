@@ -135,6 +135,26 @@ m.coged.nback.RT <- lmer(data = d.coged.SV, SV ~ taskCode*conditionCode*ageCode 
 tab_model(m.coged.nback.RT, pred.labels = c("Intercept", "Task Level", "Condition", "Age Group", "Mean Hit Rate", "Mean RT (sec)", "Task Level * Condition", "Task Level * Age Group", "Condition * Age Group", "Task Level * Condition * Age Group"), dv.labels = c("Subjective Value"), show.stat = T, show.icc = F, show.re.var = F, show.obs = F, show.r2 = F)
 ```
 
+
+## Adding NASA-TLX variables (performance, frustration) to the models predicting Subjective Value (SV)
+
+Further exploratory analyses controlled for self-reported frustration and performance variables taken from the NASA-TLX when modeling the relationship between variables of interest (e.g., task level, condition, age group) and the costs of cognitive effort. We did not find any evidence that self-reported performance was a significant predictor of cognitive effort costs above objective task performance variables, B = -0.004 [-0.01, 0.01], t = -0.80, p = 0.423. In contrast, we did find an effect of self-reported frustration on cognitive effort costs, B = -0.01 [-0.01, -0.00], t = -2.05, p = 0.040, such that participants who had higher levels of self-reported frustration after performing the N-Back had lower subjective value estimates (i.e., higher cognitive effort costs). Importantly, even when controlling for these self-reported variables, we still observed the previously reported effects of task level, condition, age group, and the task level × condition interaction on subjective value, ps < 0.011 (see Table below), demonstrating that cognitive effort costs cannot be explained only by performance and frustration variables. 
+
+```{r, NASA_summ, warning=FALSE, message=FALSE}
+#clean data frame with Cog-ED SV estimates and transform data across so that SV estimates are equivalent across both domains (i.e., gain, loss)
+NASA <- coged %>% distinct(subjectid, .keep_all = TRUE) %>% inner_join(Subject.IDs, by = "subjectid") %>% select(subjectid, ageGroup, frustration_1, frustration_2, frustration_3, frustration_4, performance_1, performance_2, performance_3, performance_4) %>%
+  group_by(subjectid, ageGroup) %>%
+  mutate(mean_Frust = (frustration_1 + frustration_2 +frustration_3 +frustration_4)/4,
+         mean_Perform = (performance_1 + performance_2 + performance_3 + performance_4)/4) %>%
+  select(subjectid, ageGroup, mean_Frust, mean_Perform)
+
+d.coged.SV <- inner_join(d.coged.SV, NASA)
+
+#adding NASA to the model predicting SV
+m.coged.NASA <- lmer(data = d.coged.SV, SV ~ taskCode*conditionCode*ageCode + mean_HitRate + meanRT_s + mean_Frust + mean_Perform + (1 | subjectid))
+tab_model(m.coged.NASA, pred.labels = c("Intercept", "Task Level", "Condition", "Age Group", "Mean Hit Rate", "Mean RT (sec)","Self-Reported Frustration", "Self-Reported Performance", "Task Level * Condition", "Task Level * Age Group", "Condition * Age Group", "Task Level * Condition * Age Group"), dv.labels = c("Subjective Value"), show.stat = T, show.icc = F, show.re.var = F, show.obs = F, show.r2 = F)
+```
+
 # EMA Data
 
 ```{r importdata, warning=FALSE}
@@ -357,4 +377,24 @@ p.reward.EMA <- ggplot(CogED.reward.EMA, aes(x, predicted, fill=group)) +
   theme_classic() + ggtitle("Reward Motivation and Daily Life Mental Demand") +
   scale_fill_brewer(palette = "Paired", "Age Group", labels = c("Younger","Older")) + labs(x="Gain Loss Index",y="Predicted Mental Demand") 
 p.reward.EMA
+```
+
+## Exploratory Analysis: Contribution of Subjective Value vs. Age Group on Daily Life Mental Demand
+
+Exploratory analyses suggested that adding the subjective value estimates from the Cog-ED helped to explain additional variance in mental demand. Furthermore, the interaction between subjective value and age group helped to explain additional variance in daily life mental demand.
+
+```{r Age_SVs, warning=FALSE, message=FALSE}
+# age + day of the week + time of the day + average Gain SV + average Loss SV (with age interactions) predicting mental demand
+m.mental.demand.age.timeDay<- lmer(data = m.demand.time.day, mean.demand ~ ageCode + dayCode + timeCode + (1 | subjectid))
+
+# age + day of the week + time of the day + average Gain SV + average Loss SV (with age interactions) predicting mental demand
+m.mental.demand.age.timeDay.Gainloss<- lmer(data = m.demand.time.day, mean.demand ~ ageCode + dayCode + timeCode + meanSV_gain_c + meanSV_loss_c + (1 | subjectid))
+
+table.age.SV <- tab_model(m.mental.demand.age.timeDay, m.mental.demand.age.timeDay.Gainloss, m.mental.demand.age.timeDay.Gainloss.int, pred.labels = c("Intercept", "Age Group", "Day of Week", "Time of Day", "SV (Gain)", "SV (Loss)", "Age Group * SV (Gain)", "Age Group * SV (Loss)"), dv.labels = c("Mental Demand Rating", "Mental Demand Rating", "Mental Demand Rating"), show.stat = T, show.icc = F, show.re.var = F, show.obs = F, show.r2 = F)
+table.age.SV
+
+#testing for additional explained variance by adding subjective value estimates to the multilevel model
+anova(m.mental.demand.age.timeDay, m.mental.demand.age.timeDay.Gainloss)
+#testing for additional explained variance by adding an age interaction term to the subjective value estimates to the multilevel model
+anova(m.mental.demand.age.timeDay.Gainloss, m.mental.demand.age.timeDay.Gainloss.int)
 ```

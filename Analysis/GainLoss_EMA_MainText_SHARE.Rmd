@@ -71,13 +71,13 @@ CogED_order_sum$Task <- factor(CogED_order_sum$Task, levels = c("red","blue","pu
 d.coged.SV$Task <- factor(d.coged.SV$Task, levels = c("red","blue","purple"), labels = c("2-Back","3-Back","4-Back"))
 ```
 
-## Figure 1: Cognitive effort discounting across gain and loss incentive contexts in younger and older adults
+## Figure 2: Cognitive effort discounting across gain and loss incentive contexts in younger and older adults
 
 ```{r Fig1, warning=FALSE, message=FALSE}
 #Plotting SV across both gain and loss domains
 inaug_2021 <- c("#5445b1", "#749dae", "#f3c483", "#5c1a33", "#cd3341","#f7dc6a")
 
-fig.1 <- ggplot(CogED_sum, aes(x=Task, y=SV, fill=Task)) + 
+fig.2 <- ggplot(CogED_sum, aes(x=Task, y=SV, fill=Task)) + 
   theme(plot.title = element_text(hjust = 0.5), panel.grid.major = element_blank(), panel.grid.minor = element_blank(), panel.background = element_blank(), axis.line = element_line(colour = "black")) +
   geom_point(data = d.coged.SV, aes(x=Task, y=SV, color=Task),
              stat="identity", alpha=0.7, position = "jitter") +
@@ -87,7 +87,7 @@ fig.1 <- ggplot(CogED_sum, aes(x=Task, y=SV, fill=Task)) +
   scale_x_discrete(breaks=NULL) +
   xlab("") + ylab("Subjective Value") + facet_grid(.~Condition + ageGroup) +
   scale_color_manual(values = inaug_2021) + scale_fill_manual(values = inaug_2021)
-fig.1
+fig.2
 ```
 
 ## Summarizing effects of task level, condition, and age group on discounting (SV estimates)
@@ -215,7 +215,7 @@ table.2 <- tab_model(m.mental.demand.age.timeDay.Gainloss.int, m.mental.demand.a
 table.2
 ```
 
-## Figure 2: Relationships between the costs of cognitive effort and daily life mental demand across gain and loss incentive contexts
+## Figure 3: Relationships between the costs of cognitive effort and daily life mental demand across gain and loss incentive contexts
 
 ```{r CogEDEMA, echo=TRUE, message=FALSE, warning=FALSE}
 #extracting predicted values from multilevel model (gain)
@@ -234,18 +234,6 @@ p.loss.EMA <- ggplot(CogED.loss.EMA, aes(x, predicted, colour=group)) +
   coord_cartesian(ylim=c(1.4,2.8)) +
   scale_colour_brewer(palette = "Paired", "Age Group", labels = c("Younger","Older")) + labs(x="Subjective Value (Loss)",
                                                                                                               y="") 
-fig.2 <- ggarrange(p.gain.EMA, p.loss.EMA, labels = c("A", "B"), common.legend = TRUE)
-fig.2
-```
-
-## Exploratory Analyses: Mediation analysis
-
-```{r mediation, warning=FALSE, message=FALSE}
-coged.mediation <- Cog_ED_ind_SV %>% inner_join(m.demand.subj.av) %>%
-   mutate(ageCode = factor(ageGroup, levels = c("Young", "Old"), labels = c(0,1)))
-coged.mediation$ageCode <- as.numeric(as.character(coged.mediation$ageCode))
-
-results.mediation.parallel = mediate(mean.demand ~ ageCode + (meanSV_gain) + (meanSV_loss), data = coged.mediation, n.iter = 5000)
-results.mediation.parallel
-summary(results.mediation.parallel)
+fig.3 <- ggarrange(p.gain.EMA, p.loss.EMA, labels = c("A", "B"), common.legend = TRUE)
+fig.3
 ```

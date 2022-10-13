@@ -11,7 +11,7 @@
 
 <meta name="author" content="Jennifer L. Crawford" />
 
-<meta name="date" content="2022-08-02" />
+<meta name="date" content="2022-09-27" />
 
 <title>Supplemental Materials: Cognitive effort-based decision-making across experimental and daily life indices in younger and older adults</title>
 
@@ -179,7 +179,7 @@ pre code {
 
 <h1 class="title toc-ignore">Supplemental Materials: Cognitive effort-based decision-making across experimental and daily life indices in younger and older adults</h1>
 <h4 class="author">Jennifer L. Crawford</h4>
-<h4 class="date">2022-08-02</h4>
+<h4 class="date">2022-09-27</h4>
 
 </div>
 
@@ -1508,8 +1508,8 @@ m.demand.frequency</code></pre>
 <h2>Control Analysis: Checking for multicollinearity in the Daily Life Mental Demand Multilevel Model</h2>
 <p>Because the zero-order correlations between the gain and loss subjective value estimates are highly correlated within participants in both younger, r = 0.58 [0.47, 0.68], t = 9.14, p &lt; 0.001, and older adults, r = 0.54 [0.41, 0.64], t = 7.66, p &lt; 0.001, we checked for multicollinearity in our model predicting daily life mental demand in which both gain and loss subjective values estimates (and their interactions with age group) were included as predictors. In the multilevel model predicting daily life mental demand, we used the centered subjective value estimates as predictors and as can be seen from the results below, the variance inflation factor for all predictors in the model are relatively low, suggesting that multicollinearity is not a concern for this model of interest.</p>
 <pre class="r"><code>#create data frame of mental demand ratings
-m.demand &lt;- EMA.clean %&gt;% select(subjectid,ageGroup,time,timeDay,day,starts_with(&quot;demand_&quot;)) %&gt;%
-  pivot_longer(names_to = &quot;category&quot;, values_to = &quot;rating&quot;, -c(subjectid, ageGroup, time, timeDay, day)) %&gt;%
+m.demand &lt;- EMA.clean %&gt;% select(subjectid,ageGroup,Date,time,timeDay,day,starts_with(&quot;demand_&quot;)) %&gt;%
+  pivot_longer(names_to = &quot;category&quot;, values_to = &quot;rating&quot;, -c(subjectid, ageGroup, Date, time, timeDay, day)) %&gt;%
   separate(col = category, into=c(NA,&quot;Category&quot;), sep = &quot;_&quot;) 
 
 #summarizing average mental demand of activities across all participants
@@ -1522,7 +1522,7 @@ m.demand.subj.av &lt;-m.demand %&gt;% group_by(subjectid, ageGroup) %&gt;%
 m.demand.subj.IDs &lt;- m.demand.subj.av %&gt;% select(subjectid, ageGroup, count.survey)
 
 #summarizing mental demand across the days of the week and time of day
-m.demand.time.day &lt;- m.demand %&gt;% group_by(subjectid,ageGroup,time,day,timeDay) %&gt;% 
+m.demand.time.day &lt;- m.demand %&gt;% group_by(subjectid,ageGroup,Date,time,day,timeDay) %&gt;% 
   summarise(count.demand = sum(!is.na(rating)),
          mean.demand = mean(rating, na.rm=T)) %&gt;%
   mutate(dayCode = factor(day, levels = c(&quot;Monday&quot;,&quot;Tuesday&quot;,&quot;Wednesday&quot;,&quot;Thursday&quot;,&quot;Friday&quot;,&quot;Saturday&quot;,&quot;Sunday&quot;),
@@ -1857,6 +1857,256 @@ summary(count.model.full)</code></pre>
 ## Multiple R-squared:  0.0031, Adjusted R-squared:  -0.01013 
 ## F-statistic: 0.2342 on 3 and 226 DF,  p-value: 0.8725</code></pre>
 </div>
+<div id="control-analysis-adding-sluggishness-and-arousal-ratings-completed-prior-to-activity-engagement-to-the-multilevel-model-of-daily-life-mental-demand" class="section level2">
+<h2>Control Analysis: Adding Sluggishness and Arousal Ratings Completed Prior to Activity Engagement to the Multilevel Model of Daily Life Mental Demand</h2>
+<p>To better understand how participant’s energy levels impact the mental demand ratings they provide at each measurement occasion, we sought to examine whether ratings of arousal and sluggishness (as proxies of energy level) measured prior to activity participation (i.e., prior to rating of the mental demand of these activities) was a significant predictor in the multilevel model of daily life mental demand. We did not find reliable evidence that arousal ratings were related to daily life mental demand, B = 0.021 [-0.01, 0.053], t = 1.26, p = 0.210. On the other hand, we found that ratings of sluggishness were a significant predictor of daily life mental demand, B = -0.025 [-0.048, -0.002], t = -2.17, p = 0.030. These results suggest than an increase in the sluggishness rating tended be associated with a reduction in the mental demand of daily life activities completed after this rating. Neither of these effects interacted with age group. Most importantly, even after controlling for self-reported ratings of arousal and sluggishness (i.e., participant’s energy levels) in the model, we still observe significant effects cognitive effort costs across both gain and loss incentive domains and their interaction with age group (see output below). These results help to further demonstrate that there remains a strong relationship between participant’s cognitive efforts costs, as measured experimentally at a single occasion, and the mental demand of the activities they engage in during daily life across both younger and older adults. Indeed, we are excited by these results and believe that our findings only begin to scratch the surface of the potential of this type of approach that aims to understand the mechanisms that underlie cognitive effort-based decision-making in daily life using the combination of experimental and daily life sampling approaches.</p>
+<pre class="r"><code>#creating data frame from affect ratings
+affect.sluggish &lt;- EMA.clean %&gt;% select(subjectid,ageGroup,Date,time,timeDay,day, starts_with(&quot;affect_&quot;)) %&gt;%
+  pivot_longer(names_to = &quot;Affect&quot;, values_to = &quot;rating&quot;, -c(subjectid, ageGroup, Date, time, timeDay,day)) %&gt;%
+  separate(col = Affect, into=c(NA,&quot;Affect_Term&quot;), sep = &quot;_&quot;) %&gt;% arrange(subjectid, Date, time) %&gt;%
+  mutate(Valence = if_else((Affect_Term == &quot;calm&quot;| Affect_Term == &quot;excited&quot;| Affect_Term == &quot;happy&quot;| Affect_Term ==  &quot;aroused&quot;),
+                           &quot;Positive&quot;, &quot;Negative&quot;),
+         valenceCode = factor(Valence, levels = c(&quot;Positive&quot;,&quot;Negative&quot;), labels = c(0,1)),
+         ageCode = factor(ageGroup, levels = c(&quot;Young&quot;,&quot;Old&quot;), labels = c(0,1))) %&gt;% rename(sluggish_rating = &quot;rating&quot;) %&gt;%
+  filter(Affect_Term == &quot;sluggish&quot;) %&gt;%
+  mutate(sluggish_lag = lag(sluggish_rating))
+affect.sluggish$valenceCode &lt;- as.numeric(as.character(affect.sluggish$valenceCode))
+affect.sluggish$ageCode &lt;- as.numeric(as.character(affect.sluggish$ageCode))
+
+affect.aroused &lt;- EMA.clean %&gt;% select(subjectid,ageGroup,Date,time,timeDay,day, starts_with(&quot;affect_&quot;)) %&gt;%
+  pivot_longer(names_to = &quot;Affect&quot;, values_to = &quot;rating&quot;, -c(subjectid, ageGroup, Date, time, timeDay,day)) %&gt;%
+  separate(col = Affect, into=c(NA,&quot;Affect_Term&quot;), sep = &quot;_&quot;) %&gt;% arrange(subjectid, Date, time) %&gt;%
+  mutate(Valence = if_else((Affect_Term == &quot;calm&quot;| Affect_Term == &quot;excited&quot;| Affect_Term == &quot;happy&quot;| Affect_Term ==  &quot;aroused&quot;),
+                           &quot;Positive&quot;, &quot;Negative&quot;),
+         valenceCode = factor(Valence, levels = c(&quot;Positive&quot;,&quot;Negative&quot;), labels = c(0,1)),
+         ageCode = factor(ageGroup, levels = c(&quot;Young&quot;,&quot;Old&quot;), labels = c(0,1))) %&gt;% rename(aroused_rating = &quot;rating&quot;) %&gt;%
+  filter(Affect_Term == &quot;aroused&quot;) %&gt;%
+  mutate(aroused_lag = lag(aroused_rating)) %&gt;% select(aroused_rating, aroused_lag)
+
+affect.lagged &lt;- cbind(affect.sluggish, affect.aroused)
+
+affect.m.demand &lt;- m.demand.time.day %&gt;% inner_join(affect.lagged)
+
+# age + day of the week + time of the day + average Gain SV + average Loss SV (with age interactions) 
+m.mental.demand.age.timeDay.Gainloss.int&lt;- lmer(data = affect.m.demand, mean.demand ~ ageCode + dayCode + timeCode + meanSV_gain_c*ageCode + meanSV_loss_c*ageCode + (1 | subjectid))
+
+# age + day of the week + time of the day + average Gain SV + average Loss SV (with age interactions) + lagged sluggish rating
+m.mental.demand.age.timeDay.Gainloss.int.sluggishLag&lt;- lmer(data = affect.m.demand, mean.demand ~ ageCode + dayCode + timeCode + meanSV_gain_c*ageCode + meanSV_loss_c*ageCode + sluggish_lag + (1 | subjectid))
+
+# age + day of the week + time of the day + average Gain SV + average Loss SV (with age interactions) + lagged aroused rating
+m.mental.demand.age.timeDay.Gainloss.int.arousedLag&lt;- lmer(data = affect.m.demand, mean.demand ~ ageCode + dayCode + timeCode + meanSV_gain_c*ageCode + meanSV_loss_c*ageCode + aroused_lag + (1 | subjectid))
+
+# age + day of the week + time of the day + average Gain SV + average Loss SV (with age interactions) + lagged aroused &amp; sluggish rating
+m.mental.demand.age.timeDay.Gainloss.int.aroused.slug&lt;- lmer(data = affect.m.demand, mean.demand ~ ageCode + dayCode + timeCode + meanSV_gain_c*ageCode + meanSV_loss_c*ageCode + sluggish_lag + aroused_lag + (1 | subjectid))
+
+#table summarizing model output after adding in sluggishness and arousal ratings
+table.S2 &lt;- tab_model(m.mental.demand.age.timeDay.Gainloss.int.aroused.slug, pred.labels = c(&quot;Intercept&quot;, &quot;Age Group&quot;, &quot;Day of Week&quot;, &quot;Time of Day&quot;, &quot;SV (Gain)&quot;, &quot;SV (Loss)&quot;,&quot;Sluggishness Rating&quot;, &quot;Arousal Rating&quot;, &quot;Age Group * SV (Gain)&quot;, &quot;Age Group * SV (Loss)&quot;), dv.labels = c(&quot;Mental Demand Rating&quot;), show.stat = T, show.icc = F, show.re.var = F, show.obs = F, show.r2 = F, digits = 3)
+table.S2</code></pre>
+<table style="border-collapse:collapse; border:none;">
+<tr>
+<th style="border-top: double; text-align:center; font-style:normal; font-weight:bold; padding:0.2cm;  text-align:left; ">
+ 
+</th>
+<th colspan="4" style="border-top: double; text-align:center; font-style:normal; font-weight:bold; padding:0.2cm; ">
+Mental Demand Rating
+</th>
+</tr>
+<tr>
+<td style=" text-align:center; border-bottom:1px solid; font-style:italic; font-weight:normal;  text-align:left; ">
+Predictors
+</td>
+<td style=" text-align:center; border-bottom:1px solid; font-style:italic; font-weight:normal;  ">
+Estimates
+</td>
+<td style=" text-align:center; border-bottom:1px solid; font-style:italic; font-weight:normal;  ">
+CI
+</td>
+<td style=" text-align:center; border-bottom:1px solid; font-style:italic; font-weight:normal;  ">
+Statistic
+</td>
+<td style=" text-align:center; border-bottom:1px solid; font-style:italic; font-weight:normal;  ">
+p
+</td>
+</tr>
+<tr>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:left; ">
+Intercept
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
+2.161
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
+2.040 – 2.282
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
+35.008
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
+<strong>&lt;0.001</strong>
+</td>
+</tr>
+<tr>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:left; ">
+Age Group
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
+-0.162
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
+-0.285 – -0.040
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
+-2.597
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
+<strong>0.009</strong>
+</td>
+</tr>
+<tr>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:left; ">
+Day of Week
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
+-0.052
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
+-0.062 – -0.041
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
+-9.553
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
+<strong>&lt;0.001</strong>
+</td>
+</tr>
+<tr>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:left; ">
+Time of Day
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
+-0.037
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
+-0.066 – -0.007
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
+-2.443
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
+<strong>0.015</strong>
+</td>
+</tr>
+<tr>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:left; ">
+SV (Gain)
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
+0.740
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
+0.401 – 1.079
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
+4.277
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
+<strong>&lt;0.001</strong>
+</td>
+</tr>
+<tr>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:left; ">
+SV (Loss)
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
+-1.015
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
+-1.398 – -0.632
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
+-5.191
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
+<strong>&lt;0.001</strong>
+</td>
+</tr>
+<tr>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:left; ">
+Sluggishness Rating
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
+-0.025
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
+-0.048 – -0.002
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
+-2.165
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
+<strong>0.030</strong>
+</td>
+</tr>
+<tr>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:left; ">
+Arousal Rating
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
+0.021
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
+-0.012 – 0.053
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
+1.255
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
+0.210
+</td>
+</tr>
+<tr>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:left; ">
+Age Group * SV (Gain)
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
+-0.485
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
+-0.927 – -0.042
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
+-2.146
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
+<strong>0.032</strong>
+</td>
+</tr>
+<tr>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:left; ">
+Age Group * SV (Loss)
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
+0.698
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
+0.212 – 1.184
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
+2.813
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
+<strong>0.005</strong>
+</td>
+</tr>
+<tr>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:left; padding-top:0.1cm; padding-bottom:0.1cm;">
+N <sub>subjectid</sub>
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; padding-top:0.1cm; padding-bottom:0.1cm; text-align:left;" colspan="4">
+230
+</td>
+</table>
+</div>
 <div id="exploratory-analysis-reward-motivation-and-daily-life-mental-demand" class="section level2">
 <h2>Exploratory Analysis: Reward Motivation and Daily Life Mental Demand</h2>
 <p>Exploratory analyses revealed a selective impact of reward motivation on daily life mental demand. To test for this effect, we created a Gain-Loss index variable by subtracting the average subjective value in the loss domain from the average subjective value in the gain domain, divided by the sum of the two (i.e., Gain SV - Loss SV/ (Gain SV + Loss SV)). We then entered this Gain-Loss index into the model predicting daily life mental demand engagement. A positive relationship was observed, B = 0.54 [0.26, 0.81], t = 3.78, p &lt; 0.001, suggesting that participants who are most willing to engage in cognitive effort to receive positive reward outcomes tend to have higher levels of mental demand than those who engage in cognitive effort more to avoid losses. The bar plot plotted below shows the predicted mental demand estimates from the multilevel model collapsed across participants who showed loss motivation (loss ≥ gain SV) vs. gain motivation (gain &gt; loss SV) with younger and older adults plotted separately; error bars represent 95% confidence intervals.</p>
@@ -2117,7 +2367,7 @@ Intercept
 2.04 – 2.22
 </td>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  2">
-45.89
+45.85
 </td>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  3">
 <strong>&lt;0.001</strong>
@@ -2199,7 +2449,7 @@ Day of Week
 -0.06 – -0.04
 </td>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  2">
--9.56
+-9.52
 </td>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  3">
 <strong>&lt;0.001</strong>
@@ -2240,10 +2490,10 @@ Time of Day
 -0.06 – -0.00
 </td>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  2">
--2.26
+-2.19
 </td>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  3">
-<strong>0.024</strong>
+<strong>0.029</strong>
 </td>
 </tr>
 <tr>
@@ -2347,7 +2597,7 @@ Age Group * SV (Gain)
 -0.93 – -0.05
 </td>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  2">
--2.16
+-2.18
 </td>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  3">
 <strong>0.030</strong>
@@ -2380,7 +2630,7 @@ Age Group * SV (Loss)
 0.21 – 1.18
 </td>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  2">
-2.81
+2.82
 </td>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  3">
 <strong>0.005</strong>
@@ -2400,34 +2650,6 @@ N
 230 <sub>subjectid</sub>
 </td>
 </table>
-<pre class="r"><code>#testing for additional explained variance by adding subjective value estimates to the multilevel model
-anova(m.mental.demand.age.timeDay, m.mental.demand.age.timeDay.Gainloss)</code></pre>
-<pre><code>## Data: m.demand.time.day
-## Models:
-## m.mental.demand.age.timeDay: mean.demand ~ ageCode + dayCode + timeCode + (1 | subjectid)
-## m.mental.demand.age.timeDay.Gainloss: mean.demand ~ ageCode + dayCode + timeCode + meanSV_gain_c + meanSV_loss_c + (1 | subjectid)
-##                                      npar   AIC   BIC  logLik deviance  Chisq
-## m.mental.demand.age.timeDay             6 15005 15045 -7496.6    14993       
-## m.mental.demand.age.timeDay.Gainloss    8 14983 15037 -7483.5    14967 26.073
-##                                      Df Pr(&gt;Chisq)    
-## m.mental.demand.age.timeDay                           
-## m.mental.demand.age.timeDay.Gainloss  2  2.179e-06 ***
-## ---
-## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1</code></pre>
-<pre class="r"><code>#testing for additional explained variance by adding an age interaction term to the subjective value estimates to the multilevel model
-anova(m.mental.demand.age.timeDay.Gainloss, m.mental.demand.age.timeDay.Gainloss.int)</code></pre>
-<pre><code>## Data: m.demand.time.day
-## Models:
-## m.mental.demand.age.timeDay.Gainloss: mean.demand ~ ageCode + dayCode + timeCode + meanSV_gain_c + meanSV_loss_c + (1 | subjectid)
-## m.mental.demand.age.timeDay.Gainloss.int: mean.demand ~ ageCode + dayCode + timeCode + meanSV_gain_c * ageCode + meanSV_loss_c * ageCode + (1 | subjectid)
-##                                          npar   AIC   BIC  logLik deviance
-## m.mental.demand.age.timeDay.Gainloss        8 14983 15037 -7483.5    14967
-## m.mental.demand.age.timeDay.Gainloss.int   10 14978 15045 -7479.1    14958
-##                                           Chisq Df Pr(&gt;Chisq)  
-## m.mental.demand.age.timeDay.Gainloss                           
-## m.mental.demand.age.timeDay.Gainloss.int 8.8807  2    0.01179 *
-## ---
-## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1</code></pre>
 </div>
 </div>
 

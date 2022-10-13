@@ -276,8 +276,8 @@ Because the zero-order correlations between the gain and loss subjective value e
 
 ```{r mentalDemand, warning=FALSE, message=FALSE}
 #create data frame of mental demand ratings
-m.demand <- EMA.clean %>% select(subjectid,ageGroup,time,timeDay,day,starts_with("demand_")) %>%
-  pivot_longer(names_to = "category", values_to = "rating", -c(subjectid, ageGroup, time, timeDay, day)) %>%
+m.demand <- EMA.clean %>% select(subjectid,ageGroup,Date,time,timeDay,day,starts_with("demand_")) %>%
+  pivot_longer(names_to = "category", values_to = "rating", -c(subjectid, ageGroup, Date, time, timeDay, day)) %>%
   separate(col = category, into=c(NA,"Category"), sep = "_") 
 
 #summarizing average mental demand of activities across all participants
@@ -290,7 +290,7 @@ m.demand.subj.av <-m.demand %>% group_by(subjectid, ageGroup) %>%
 m.demand.subj.IDs <- m.demand.subj.av %>% select(subjectid, ageGroup, count.survey)
 
 #summarizing mental demand across the days of the week and time of day
-m.demand.time.day <- m.demand %>% group_by(subjectid,ageGroup,time,day,timeDay) %>% 
+m.demand.time.day <- m.demand %>% group_by(subjectid,ageGroup,Date,time,day,timeDay) %>% 
   summarise(count.demand = sum(!is.na(rating)),
          mean.demand = mean(rating, na.rm=T)) %>%
   mutate(dayCode = factor(day, levels = c("Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"),
@@ -354,6 +354,55 @@ count.model.full <- lm(data = count.data, mean.count ~ meanSV_gain + meanSV_loss
 summary(count.model.full)
 ```
 
+## Control Analysis: Adding Sluggishness and Arousal Ratings Completed Prior to Activity Engagement to the Multilevel Model of Daily Life Mental Demand
+
+To better understand how participant's energy levels impact the mental demand ratings they provide at each measurement occasion, we sought to examine whether ratings of arousal and sluggishness (as proxies of energy level) measured prior to activity participation (i.e., prior to rating of the mental demand of these activities) was a significant predictor in the multilevel model of daily life mental demand. We did not find reliable evidence that arousal ratings were related to daily life mental demand, B = 0.021 [-0.01, 0.053], t = 1.26, p = 0.210. On the other hand, we found that ratings of sluggishness were a significant predictor of daily life mental demand, B = -0.025 [-0.048, -0.002], t = -2.17, p = 0.030. These results suggest than an increase in the sluggishness rating tended be associated with a reduction in the mental demand of daily life activities completed after this rating. Neither of these effects interacted with age group. Most importantly, even after controlling for self-reported ratings of arousal and sluggishness (i.e., participant's energy levels) in the model, we still observe significant effects cognitive effort costs across both gain and loss incentive domains and their interaction with age group (see output below). These results help to further demonstrate that there remains a strong relationship between participant's cognitive efforts costs, as measured experimentally at a single occasion, and the mental demand of the activities they engage in during daily life across both younger and older adults. Indeed, we are excited by these results and believe that our findings only begin to scratch the surface of the potential of this type of approach that aims to understand the mechanisms that underlie cognitive effort-based decision-making in daily life using the combination of experimental and daily life sampling approaches.
+
+```{r affect, message=F, warning=F}
+#creating data frame from affect ratings
+affect.sluggish <- EMA.clean %>% select(subjectid,ageGroup,Date,time,timeDay,day, starts_with("affect_")) %>%
+  pivot_longer(names_to = "Affect", values_to = "rating", -c(subjectid, ageGroup, Date, time, timeDay,day)) %>%
+  separate(col = Affect, into=c(NA,"Affect_Term"), sep = "_") %>% arrange(subjectid, Date, time) %>%
+  mutate(Valence = if_else((Affect_Term == "calm"| Affect_Term == "excited"| Affect_Term == "happy"| Affect_Term ==  "aroused"),
+                           "Positive", "Negative"),
+         valenceCode = factor(Valence, levels = c("Positive","Negative"), labels = c(0,1)),
+         ageCode = factor(ageGroup, levels = c("Young","Old"), labels = c(0,1))) %>% rename(sluggish_rating = "rating") %>%
+  filter(Affect_Term == "sluggish") %>%
+  mutate(sluggish_lag = lag(sluggish_rating))
+affect.sluggish$valenceCode <- as.numeric(as.character(affect.sluggish$valenceCode))
+affect.sluggish$ageCode <- as.numeric(as.character(affect.sluggish$ageCode))
+
+affect.aroused <- EMA.clean %>% select(subjectid,ageGroup,Date,time,timeDay,day, starts_with("affect_")) %>%
+  pivot_longer(names_to = "Affect", values_to = "rating", -c(subjectid, ageGroup, Date, time, timeDay,day)) %>%
+  separate(col = Affect, into=c(NA,"Affect_Term"), sep = "_") %>% arrange(subjectid, Date, time) %>%
+  mutate(Valence = if_else((Affect_Term == "calm"| Affect_Term == "excited"| Affect_Term == "happy"| Affect_Term ==  "aroused"),
+                           "Positive", "Negative"),
+         valenceCode = factor(Valence, levels = c("Positive","Negative"), labels = c(0,1)),
+         ageCode = factor(ageGroup, levels = c("Young","Old"), labels = c(0,1))) %>% rename(aroused_rating = "rating") %>%
+  filter(Affect_Term == "aroused") %>%
+  mutate(aroused_lag = lag(aroused_rating)) %>% select(aroused_rating, aroused_lag)
+
+affect.lagged <- cbind(affect.sluggish, affect.aroused)
+
+affect.m.demand <- m.demand.time.day %>% inner_join(affect.lagged)
+
+# age + day of the week + time of the day + average Gain SV + average Loss SV (with age interactions) 
+m.mental.demand.age.timeDay.Gainloss.int<- lmer(data = affect.m.demand, mean.demand ~ ageCode + dayCode + timeCode + meanSV_gain_c*ageCode + meanSV_loss_c*ageCode + (1 | subjectid))
+
+# age + day of the week + time of the day + average Gain SV + average Loss SV (with age interactions) + lagged sluggish rating
+m.mental.demand.age.timeDay.Gainloss.int.sluggishLag<- lmer(data = affect.m.demand, mean.demand ~ ageCode + dayCode + timeCode + meanSV_gain_c*ageCode + meanSV_loss_c*ageCode + sluggish_lag + (1 | subjectid))
+
+# age + day of the week + time of the day + average Gain SV + average Loss SV (with age interactions) + lagged aroused rating
+m.mental.demand.age.timeDay.Gainloss.int.arousedLag<- lmer(data = affect.m.demand, mean.demand ~ ageCode + dayCode + timeCode + meanSV_gain_c*ageCode + meanSV_loss_c*ageCode + aroused_lag + (1 | subjectid))
+
+# age + day of the week + time of the day + average Gain SV + average Loss SV (with age interactions) + lagged aroused & sluggish rating
+m.mental.demand.age.timeDay.Gainloss.int.aroused.slug<- lmer(data = affect.m.demand, mean.demand ~ ageCode + dayCode + timeCode + meanSV_gain_c*ageCode + meanSV_loss_c*ageCode + sluggish_lag + aroused_lag + (1 | subjectid))
+
+#table summarizing model output after adding in sluggishness and arousal ratings
+table.S2 <- tab_model(m.mental.demand.age.timeDay.Gainloss.int.aroused.slug, pred.labels = c("Intercept", "Age Group", "Day of Week", "Time of Day", "SV (Gain)", "SV (Loss)","Sluggishness Rating", "Arousal Rating", "Age Group * SV (Gain)", "Age Group * SV (Loss)"), dv.labels = c("Mental Demand Rating"), show.stat = T, show.icc = F, show.re.var = F, show.obs = F, show.r2 = F, digits = 3)
+table.S2
+```
+
 ## Exploratory Analysis: Reward Motivation and Daily Life Mental Demand
 
 Exploratory analyses revealed a selective impact of reward motivation on daily life mental demand. To test for this effect, we created a Gain-Loss index variable by subtracting the average subjective value in the loss domain from the average subjective value in the gain domain, divided by the sum of the two (i.e., Gain SV - Loss SV/ (Gain SV + Loss SV)). We then entered this Gain-Loss index into the model predicting daily life mental demand engagement. A positive relationship was observed, B = 0.54 [0.26, 0.81], t = 3.78, p < 0.001, suggesting that participants who are most willing to engage in cognitive effort to receive positive reward outcomes tend to have higher levels of mental demand than those who engage in cognitive effort more to avoid losses. The bar plot plotted below shows the predicted mental demand estimates from the multilevel model collapsed across participants who showed loss motivation (loss ≥ gain SV) vs. gain motivation (gain > loss SV) with younger and older adults plotted separately; error bars represent 95% confidence intervals.
@@ -392,9 +441,4 @@ m.mental.demand.age.timeDay.Gainloss<- lmer(data = m.demand.time.day, mean.deman
 
 table.age.SV <- tab_model(m.mental.demand.age.timeDay, m.mental.demand.age.timeDay.Gainloss, m.mental.demand.age.timeDay.Gainloss.int, pred.labels = c("Intercept", "Age Group", "Day of Week", "Time of Day", "SV (Gain)", "SV (Loss)", "Age Group * SV (Gain)", "Age Group * SV (Loss)"), dv.labels = c("Mental Demand Rating", "Mental Demand Rating", "Mental Demand Rating"), show.stat = T, show.icc = F, show.re.var = F, show.obs = F, show.r2 = F)
 table.age.SV
-
-#testing for additional explained variance by adding subjective value estimates to the multilevel model
-anova(m.mental.demand.age.timeDay, m.mental.demand.age.timeDay.Gainloss)
-#testing for additional explained variance by adding an age interaction term to the subjective value estimates to the multilevel model
-anova(m.mental.demand.age.timeDay.Gainloss, m.mental.demand.age.timeDay.Gainloss.int)
 ```
